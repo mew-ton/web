@@ -26,24 +26,36 @@ async function run(wc: WebContainer, command: string, args: string[]): Promise<{
   }
 }
 
-// 試作用の診断。WebContainer 内の curl と通信の可否を確かめる（要件書 10章）
-async function diagnose(wc: WebContainer): Promise<{ nativeCurl: boolean; lines: string[] }> {
-  const curl = await run(wc, "curl", ["--version"]);
+// 試作用の診断。WebContainer 内の curl で実際にこのサイトを読めるかを確かめる（要件書 11章）
+// 標準の curl があっても、http のままの通信（混在コンテンツ）や CORS で失敗しうるため、実際に叩いて判定する
+async function diagnose(wc: WebContainer): Promise<{ useShim: boolean; lines: string[] }> {
+  const version = await run(wc, "curl", ["--version"]);
   const probe = await run(wc, "node", [
     "-e",
     `fetch(${JSON.stringify(location.origin + "/")}, { headers: { accept: "text/plain" } })
       .then((r) => console.log("status " + r.status))
       .catch((e) => { console.log("error " + e.message); process.exit(1); })`,
   ]);
-  const nativeCurl = curl.exit === 0;
-  return {
-    nativeCurl,
-    lines: [
-      `curl --version : exit ${curl.exit} ${curl.output.split("\n")[0].trim()}`,
-      `node fetch ${location.origin}/ : exit ${probe.exit} ${probe.output.trim()}`,
-      `curl コマンド : ${nativeCurl ? "WebContainer 標準" : "自前（bin/curl）"}`,
-    ],
-  };
+  const lines = [
+    `curl --version : exit ${version.exit} ${version.output.split("\n")[0].trim()}`,
+    `node fetch ${location.origin}/ : exit ${probe.exit} ${probe.output.trim()}`,
+  ];
+
+  // ローカル開発では mewton.jp ではなくこのページの配信元を叩く必要があるため、自前の curl を使う
+  if (location.host !== host) {
+    lines.push("curl コマンド : 自前（ローカル開発のため）");
+    return { useShim: true, lines };
+  }
+  if (version.exit !== 0) {
+    lines.push("curl コマンド : 自前（標準の curl が無い）");
+    return { useShim: true, lines };
+  }
+  // 利用者が打つのと同じ形（スキーム無し＝http）で叩く
+  const native = await run(wc, "curl", ["-s", `${host}/`]);
+  const nativeOk = native.exit === 0 && native.output.trim() !== "";
+  lines.push(`curl -s ${host}/ : exit ${native.exit} ${nativeOk ? "本文あり" : "本文なし"}`);
+  lines.push(`curl コマンド : ${nativeOk ? "WebContainer 標準" : "自前（標準の curl で読めない）"}`);
+  return { useShim: !nativeOk, lines };
 }
 
 async function main() {
@@ -66,9 +78,7 @@ async function main() {
     return;
   }
 
-  const { nativeCurl, lines } = await diagnose(wc);
-  // ローカル開発では mewton.jp ではなくこのページの配信元を叩く必要があるため、自前の curl を使う
-  const useShim = !nativeCurl || location.host !== host;
+  const { useShim, lines } = await diagnose(wc);
   if (useShim) {
     await wc.mount({ bin: { directory: { curl: { file: { contents: CURL_SHIM } } } } });
   }
