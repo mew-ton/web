@@ -27,3 +27,13 @@ open http://localhost:3000/works  # ブラウザでターミナル
 `npm run typecheck` で型検査。
 
 ブラウザのターミナル冒頭に出る `[diag]` 行は試作用の診断で、WebContainer 内の `curl` の有無と通信の可否を表示する。
+
+## ランタイムを変えて試す
+
+Nitro の preset を切り替えると、同じコードを別のランタイム向けにビルドできる（要件書 7.4）。
+
+```sh
+# Cloudflare Workers（workerd）でローカル実行
+NITRO_PRESET=cloudflare-module npm run build
+npx wrangler dev .output/server/index.mjs --assets .output/public --compatibility-flags nodejs_compat
+```

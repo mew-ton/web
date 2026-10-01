@@ -21,17 +21,14 @@ export default defineEventHandler(async (event) => {
     return (page ?? notFoundPage(siteHost)).text;
   }
 
-  // WebContainer は HTTPS が必須なので、ブラウザだけ https へ寄せる
-  const host = getRequestHost(event, { xForwardedHost: true });
-  const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
-  if (!isLocal && getRequestProtocol(event, { xForwardedProto: true }) === "http") {
-    return sendRedirect(event, `https://${host}${event.path}`, 301);
-  }
-
+  // https への移動はサーバーでは行わない。プロトコルの判定がランタイムごとに異なり、
+  // 判定を誤るとリダイレクトが無限に続くため。ブラウザ側のスクリプトで移動する（要件書 7.1）
   setResponseHeaders(event, {
     "Content-Type": "text/html; charset=utf-8",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Embedder-Policy": "require-corp",
+    // https で受け取ったときだけブラウザが従う。curl は既定で HSTS を使わないため影響しない
+    "Strict-Transport-Security": "max-age=31536000",
   });
   return renderHtml(page ?? notFoundPage(siteHost), path, siteHost);
 });

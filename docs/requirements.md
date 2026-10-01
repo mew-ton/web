@@ -109,14 +109,16 @@ $ curl mewton.jp/contact   # 連絡先
 - レスポンスに `Vary: Accept` を付け、CDN やキャッシュが HTML とテキストを取り違えないようにする。
 - テキストの応答には CORS ヘッダー（`Access-Control-Allow-Origin: *`）を付ける。ブラウザ内のターミナルが別オリジン扱いでリクエストする可能性があるため（7.2 の検証で要否を確認する）。
 - 出し分けがあるため、すべてを静的ファイルとして事前生成して配信する構成は取れない。サーバー（またはエッジ）で Nitro を動かす。
-- `curl mewton.jp` は `http://` でアクセスしてくる。curl は既定ではリダイレクトを追わないため、HTTPS へリダイレクトすると何も表示されない。テキストの応答は `http` のまま返し、HTTPS へのリダイレクトはブラウザ（HTML）にだけ行う（WebContainer は HTTPS が必須のため）。
+- `curl mewton.jp` は `http://` でアクセスしてくる。curl は既定ではリダイレクトを追わないため、HTTPS へリダイレクトすると何も表示されない。そのため、サーバーは http で来ても https で来ても同じ内容を返す。
+- ブラウザを https へ移すのは、サーバーではなくブラウザ側のスクリプトで行う（WebContainer は HTTPS が必須のため）。サーバーでプロトコルを判定すると、判定方法がランタイムごとに異なり（7.4）、誤るとリダイレクトが無限に続くため。JavaScript が動かない環境では http のまま代替表示を読める。
+- HTML の応答に `Strict-Transport-Security` を付け、2回目以降のブラウザのアクセスは最初から https にする。ブラウザは https で受け取ったときだけこれに従い、curl は既定で使わないため、`curl mewton.jp` には影響しない。サブドメインには広げない（`includeSubDomains` は付けない）。
 
 ### 7.2 WebContainer を使うことによる制約
 
 | 制約 | 対応方針 |
 | --- | --- |
 | ページのクロスオリジン分離が必要（`Cross-Origin-Opener-Policy: same-origin` と `Cross-Origin-Embedder-Policy: require-corp`。パッケージ同梱の README で確認済み） | HTML の応答すべてに付ける。外部の画像や埋め込みは使わない方針なので、これによる問題はない |
-| HTTPS 必須（localhost を除く。同 README で確認済み） | ブラウザは HTTPS へリダイレクトする（7.1） |
+| HTTPS 必須（localhost を除く。同 README で確認済み） | ブラウザ側のスクリプトで https へ移る（7.1） |
 | 実行時に StackBlitz のサーバー（stackblitz.com など）に依存する | 届かない場合 `boot()` は失敗も完了もしないため、20秒で打ち切って代替表示のままにする |
 | 標準の `curl` はある見込み（WebContainer API のチュートリアル環境のターミナルで使えたとの報告）。ただし、このサイト上で `curl mewton.jp`（スキーム無し＝`http`）が通るかは未検証。ブラウザ経由の通信なら https のページからの http 通信（混在コンテンツ）として遮断されうる | 起動時に標準の `curl` で実際にこのサイトを叩き、本文が返れば標準の `curl` を、失敗すれば自前の同名コマンド（https で取得）を使う |
 | 対応ブラウザが限られる（スマートフォンを含む） | 非対応環境では6章の代替表示のまま見せる |
@@ -127,6 +129,16 @@ $ curl mewton.jp/contact   # 連絡先
 ### 7.3 ブラウザでパスを開いたときの動き
 
 - ブラウザで `mewton.jp/works` などを直接開いた場合、ターミナルを起動して `curl mewton.jp/works` を自動で実行した状態にする。URL とターミナルに表示される内容を一致させるため。
+
+### 7.4 ランタイムに依存しない作り
+
+Nitro を選んだのは、同じコードをどのランタイム（Node.js、Cloudflare Workers、Deno など）にもデプロイできるようにするため。curl かどうかの判定は実行時に行う必要があるので、その判定が全ランタイムで同じ結果になるようにする。
+
+- 判定に使うのはリクエストヘッダー（`Accept`、`Host`）だけにする。どのランタイムでもそのまま届くため。
+- プロトコル（http / https）をサーバーで判定しない。h3 の `getRequestProtocol` は `X-Forwarded-Proto` ヘッダーか Node.js のソケットの暗号化有無で判定するため、Node.js のソケットが無いランタイムでは https を判定できない場合がある。
+- 実行時にファイルシステムを読まない。コンテンツは Nitro の server assets としてビルド時に同梱する。
+- 事前生成（prerender）や Nitro のキャッシュ（`routeRules` の `cache` / `swr` / `isr`）を使わない。出し分けの結果が固定されてしまうため。
+- サーバーの前に CDN やプロキシを置く場合、HTML 応答をキャッシュさせない。CDN によっては `Vary: Accept` を考慮せずにキャッシュし、curl に HTML を返してしまうため。
 
 ## 8. テキスト出力
 
@@ -152,17 +164,36 @@ $ curl mewton.jp/contact   # 連絡先
 | 項目 | 要件 |
 | --- | --- |
 | 言語 | 日本語のみ |
-| 公開先 | 独自ドメイン `mewton.jp`。Nitro をサーバーまたはエッジで動かせて、レスポンスヘッダーを制御でき、HTTP を強制的に HTTPS へリダイレクトしないホスティング先（7.1） |
+| 公開先 | 独自ドメイン `mewton.jp`。条件と候補は 9.1 |
 | スマートフォン | 代替表示で読めること。ターミナルの操作性は問わない |
 | パフォーマンス | 代替テキストが WebContainer の起動を待たずに表示されること |
 | アクセシビリティ | 代替表示で担保する（6章） |
 | SEO / OGP | HTML に各パスのタイトル・説明・OGP 画像と、本文の代替テキストを持たせる |
 
+### 9.1 ホスティング先
+
+条件:
+
+1. Nitro をサーバーまたはエッジで実行できる（事前生成のみの静的ホスティングは不可。7.1）
+2. レスポンスヘッダーをアプリから設定できる（COOP / COEP / CORS / `Vary`）
+3. http のリクエストを https へ強制リダイレクトせず、アプリまで届ける（7.1）
+
+| 候補 | Nitro の preset | 条件3 | 評価 |
+| --- | --- | --- | --- |
+| Cloudflare Workers | `cloudflare-module` | 可。「Always Use HTTPS」はゾーン単位の設定で、オフにできる | **第一候補**。試作をこのランタイム（workerd）で動かし、Node.js と同じ応答になることを確認済み（11章）。`mewton.jp` の DNS を Cloudflare に移す必要がある。既存のレコード（メール用など）も移行する |
+| Fly.io | `node-server`（コンテナ） | 可。`force_https` は既定で `false` | **第二候補**。Node.js で動作確認済みの構成をそのまま載せられる。常駐させる分の費用がかかる |
+| VPS など＋`node-server` | `node-server` | 可（自前で設定） | 可能だが運用（OS 更新・証明書・監視）の負担が大きい |
+| Deno Deploy | `deno-deploy` | 未確認 | 公式情報を確認できていない |
+| Vercel | `vercel` | 不可。http → https のリダイレクトは無効化できない | 単独では除外。前段に http を通すプロキシ（Cloudflare など）を置けば使えるが、構成が二重になる |
+| Netlify | `netlify` | 不可。https 強制は無効化できない | 単独では除外（理由は Vercel と同じ） |
+
+> 各社の仕様は公式ドキュメントへ直接アクセスできなかったため、検索結果からの確認にとどまる。採用前に公式ドキュメントで再確認する。
+
 ## 10. 未決定事項
 
 - [ ] 本番ドメイン上で、標準の `curl` で `curl mewton.jp` が通るかの検証（7.2、11章）
 - [ ] StackBlitz の利用規約の確認（7.2）
-- [ ] ホスティング先（Nitro のサーバー / エッジ実行、ヘッダー制御、HTTP のまま応答できること）
+- [ ] ホスティング先の決定（9.1。第一候補は Cloudflare Workers）
 - [ ] Markdown をテキストに整形する方法（試作では Markdown のまま出力）
 - [ ] ANSI の色・装飾を使うか（8.1）
 - [ ] About / Contact のデータ形式
@@ -179,7 +210,9 @@ $ curl mewton.jp/contact   # 連絡先
 | --- | --- |
 | `curl` に各パスの本文テキストが返る | 確認済み（`Content-Type: text/plain`、`Vary: Accept`、CORS ヘッダー付き） |
 | ブラウザ（`Accept: text/html`）に HTML が返る | 確認済み（COOP / COEP 付き、`crossOriginIsolated` が `true`） |
-| HTTP のとき、curl はそのまま本文、ブラウザは HTTPS へリダイレクト | 確認済み |
+| http で来ても curl にはそのまま本文を返す | 確認済み |
+| localhost 以外の http でブラウザが開くと、スクリプトで https へ移る | 確認済み（localhost では移らない） |
+| Cloudflare Workers のランタイム（workerd、`wrangler dev`）で Node.js と同じ応答になる | 確認済み（本文・ステータス・`Content-Type`・`Vary`・CORS・COOP / COEP・静的アセット、`crossOriginIsolated` が `true`） |
 | 本文の無い作品の詳細パスは 404 | 確認済み |
 | 全角を含む行の桁揃え | 確認済み（全角を2桁として計算） |
 | 代替表示のリンクで各パスへ移動できる | 確認済み |

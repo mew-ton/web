@@ -58,7 +58,16 @@ async function diagnose(wc: WebContainer): Promise<{ useShim: boolean; lines: st
   return { useShim: !nativeOk, lines };
 }
 
+function isLocalhost(): boolean {
+  return ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+}
+
 async function main() {
+  // WebContainer は HTTPS が必須。サーバーではなくここで https へ移る（要件書 7.1）
+  if (location.protocol === "http:" && !isLocalhost()) {
+    location.replace(`https://${location.host}${location.pathname}${location.search}${location.hash}`);
+    return;
+  }
   if (!crossOriginIsolated) {
     setStatus("この環境ではターミナルを起動できないため、テキストで表示しています。");
     return;

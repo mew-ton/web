@@ -147,3 +147,4 @@ vite.config.ts.timestamp-*
 .nitro/
 public/terminal.js
 public/xterm.css
+.wrangler/
