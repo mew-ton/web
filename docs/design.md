@@ -1,7 +1,7 @@
 # ポートフォリオサイト 詳細設計（技術）
 
 - ステータス: ドラフト
-- 最終更新: 2026-10-02（IDE 風の構成へ変更）
+- 最終更新: 2026-10-02（IDE 風の構成へ変更。同日、親ページの中に常に iframe を置く構成に改定）
 - 前提: [要件定義](requirements.md)。見た目の詳細（配色・レイアウト）は対象外で、後で決める。
 
 ## 1. 全体構成
@@ -10,23 +10,24 @@
 
 | プロジェクト | 場所 | 役割 | 主な技術 |
 | --- | --- | --- | --- |
-| サイト | `apps/site` | メインパネルに表示するページ（各ディレクトリの `index.html`）と、コンテンツの正本（Content Collections） | Astro（静的生成） |
-| IDE | `apps/ide` | ファイルツリー・ターミナル・パネルの切り替え・メインパネルの iframe・URL とカレントディレクトリの連動 | Vite、xterm.js（暫定）、WebContainer API |
+| 親ページ | `apps/shell` | ブラウザで開く URL のページ（CSR）。メインパネルの iframe、URL との連動、「最大化をやめる」ボタン。IDE モードの部分（ファイルツリー・ターミナル・カレントディレクトリの連動）は非同期で読み込む | Vite、xterm.js（暫定）、WebContainer API |
+| サイト | `apps/site` | iframe に表示するコンテンツのページ（各ディレクトリの `index.html`）と、コンテンツの正本（Content Collections） | Astro（静的生成） |
 | コンテナ | `apps/container` | WebContainer の作業ディレクトリにマウントするファイル群（サイトのディレクトリ構成。将来は projects） | TypeScript |
 
 ```
-apps/site（Astro） ──ビルド──▶ 各ディレクトリの index.html・アセット ─┐
-        │                                                           │
-        └─ディレクトリ構成──▶ apps/container ──▶ マウント用ファイル群 ┤──▶ 配信物（Vercel の静的配信）
-                                                                    │
-apps/ide（Vite） ──ビルド──▶ IDE のスクリプト・CSS・フォント ────────┘
+apps/shell（Vite） ──ビルド──▶ 親ページ・IDE のスクリプト・フォント ──────┐
+                                                                      │
+apps/site（Astro） ──ビルド──▶ コンテンツのページ（/_content/…）・アセット ─┤──▶ 配信物（Vercel の静的配信）
+        │                                                             │
+        └─ディレクトリ構成──▶ apps/container ──▶ マウント用ファイル群 ───┘
 ```
 
 方針:
 
-- **Astro のページが正の URL**（要件 6.1）。IDE はその上に重ねる「拡張」で、無くてもサイトは成り立つ。
-- **最大化モードでは IDE を読み込まない**。Astro のページには、「最大化をやめる」ボタンと IDE の遅延読み込みだけを行う小さなスクリプトを入れる。
-- **すべての HTML に COOP / COEP を付ける**（メインパネルの iframe に入るページも含む。要件 7.1）。
+- **親ページの中に常に iframe がある**（要件 6.1）。最大化モードは iframe を画面いっぱいにした状態で、IDE モードとの違いはレイアウト（CSS）だけ。モードを切り替えても iframe は読み直さない。
+- **最大化モードでは IDE を読み込まない**。親ページの初期のスクリプトは、iframe の表示・URL との連動・ボタンだけにする。IDE モードの部分は `import()` で分割し、最大化をやめたときに読み込む。
+- **コンテンツのページは IDE のことを知らない**。普通の静的ページとして作り、親ページ側ですべて扱う。
+- **すべての HTML に COOP / COEP を付ける**（親ページも iframe に入るページも。要件 7.1）。
 
 ## 2. モノレポ構成
 
@@ -35,23 +36,28 @@ apps/ide（Vite） ──ビルド──▶ IDE のスクリプト・CSS・フ�
 ```
 vite.config.ts           # Vite+ のルート設定（lint・fmt・タスク）
 pnpm-workspace.yaml
-vercel.json              # ヘッダー（COOP / COEP / HSTS）とビルド設定
+vercel.json              # ヘッダー（COOP / COEP / HSTS）・書き換え・ビルド設定
 apps/
-  site/                  # Astro
+  shell/                 # Vite（CSR）
+    index.html           # 親ページ
+    src/
+      main.ts            # 親ページの起動（レイアウト・iframe・ボタン）
+      sync.ts            # iframe と URL の連動（5章）
+      ide/               # 最大化をやめたときに import() で読み込む
+        index.ts         # IDE モードの起動
+        terminal.ts      # xterm.js と WebContainer
+        tree.ts          # ファイルツリー
+        cwd.ts           # カレントディレクトリの連動（5章）
+    public/fonts/        # ターミナル用フォント（OFL。ライセンス文を同梱）
+  site/                  # Astro（base: /_content/）
     src/content/         # Content Collections（JSON ＋ スキーマ）
     src/pages/           # 各ディレクトリの index.html になるページ
-    src/components/
-      MaximizeToggle.astro  # 「最大化をやめる」ボタンと IDE の遅延読み込み
-    public/fonts/        # フォント（OFL。ライセンス文を同梱）
-  ide/                   # Vite（ライブラリとしてビルドし、site から読み込む）
-    src/
-      index.ts           # IDE モードの起動（パネル構成・iframe・ツリー・ターミナル）
-      terminal.ts        # xterm.js と WebContainer
-      tree.ts            # ファイルツリー
-      sync.ts            # URL・カレントディレクトリ・iframe の連動（5章）
+    public/fonts/        # ページ用フォント（OFL。ライセンス文を同梱）
   container/
     src/build.ts         # site のビルド結果からディレクトリ構成を集め、マウント用ファイル群を出力
 ```
+
+`/_content/` は仮の名前（要件 6.1）。Astro の `base` で設定する。
 
 ### 2.2 ツール
 
@@ -64,14 +70,15 @@ apps/
 `vp run build` のタスク依存で次の順に実行する。
 
 1. `apps/site`: Astro で静的生成（Content Collections の検証を含む）。フォントをページに出る文字だけにサブセット化する
-2. `apps/ide`: Vite でビルド（IDE のスクリプト・CSS・ターミナル用フォント）
-3. `apps/container`: site のビルド結果から、マウント用のファイル群（WebContainer の `FileSystemTree`）を出力
-4. 3つの出力を1つの配信物にまとめる（site の出力をルートに、IDE とコンテナの出力をサブディレクトリに置く）
+2. `apps/container`: site のビルド結果から、マウント用のファイル群（WebContainer の `FileSystemTree`）を出力
+3. `apps/shell`: Vite でビルド（親ページ、IDE のスクリプト、ターミナル用フォント）。site のディレクトリ構成から、親ページが受け付けるパスの一覧を作る
+4. 3つの出力を1つの配信物にまとめる
 
 | 配信物 | パス（例） | 備考 |
 | --- | --- | --- |
-| 各ページ | `/`、`/works/` など | Astro の出力 |
-| IDE のスクリプトなど | `/_ide/…`（ハッシュ付き） | 最大化をやめたときに読み込む |
+| 親ページ | `/`、`/works/` など | 全パス共通の1枚にするか、パスごとに生成するかは未決定（10章） |
+| 親ページ・IDE のスクリプトなど | `/_ide/…`（ハッシュ付き） | IDE モードの部分は最大化をやめたときに読み込む |
+| コンテンツのページ | `/_content/`、`/_content/works/` など | Astro の出力 |
 | マウント用ファイル群 | `/_ide/fs.json` など | IDE モードの起動時に取得してマウントする |
 
 ### 2.4 開発時
@@ -79,62 +86,76 @@ apps/
 | 起動方法 | 用途 |
 | --- | --- |
 | `vp run dev:site` | ページの開発（Astro の開発サーバー） |
-| `vp run dev` | IDE を含めた結合の確認（Astro の開発サーバーから IDE を読み込む） |
+| `vp run dev` | 結合の確認。親ページ（Vite の開発サーバー）から `/_content/` を Astro の開発サーバーへ中継する（Vite の `server.proxy`） |
 
-- 開発サーバーにも COOP / COEP を付ける（Astro / Vite の `server.headers`）。
+- どちらの開発サーバーにも COOP / COEP を付ける（`server.headers`）。
 
-## 3. ページ（apps/site）
+## 3. コンテンツのページ（apps/site）
 
 - 各ディレクトリの `index.html` を Astro で静的生成する。ディレクトリ構成は後で決める（要件 4.1）。
 - コンテンツの正本は Content Collections（JSON ＋ スキーマ）。スキーマに合わない場合はビルドが失敗する。
 - アイコンは GitHub アカウントのアイコンをビルド時に取得して同梱し、自分のドメインから配信する（COEP の制約のため）。取得に失敗したらビルドを止める。
-- 各ページに `MaximizeToggle` を置く。押されたら `import()` で IDE を読み込み、IDE モードを起動する。
-- iframe の中で表示されているときは、`MaximizeToggle` を出さない（入れ子にしないため）。
+- ページ間のリンクは、普通の相対リンク（iframe の中で移動する）。親ページとの連動は親ページ側で行う（5章）。
+- 親ページのことは知らない（ボタンや連動のスクリプトを持たない）。
 
-## 4. IDE モード（apps/ide）
+## 4. 親ページ（apps/shell）
 
-### 4.1 起動の流れ
+### 4.1 最大化モード（初期表示）
 
-1. 現在のページの上に、メインパネル・ファイルツリー・ターミナルのレイアウトを作る
-2. メインパネルの iframe に、現在の URL のページを読み込む（同じオリジン）
-3. ターミナル用フォントの読み込みを待ってから xterm.js を開く（Unicode 11 の文字幅を有効にする。9章）
-4. WebContainer を起動する（時間で打ち切り。要件 7.1）。API キーが必要なら `boot()` の前に `configureAPIKey()` を呼ぶ
-5. マウント用ファイル群を取得して作業ディレクトリにマウントする
-6. シェル（`jsh`）を起動し、現在の URL に対応するディレクトリへ `cd` した状態にする
-7. WebContainer の帰属表示を出す（必須。場所・文言は後で決める）
+1. `location.pathname` を、コンテンツのページのパスに変換して（`/works/` → `/_content/works/`）、iframe を画面いっぱいに表示する
+2. 「最大化をやめる」ボタンを出す（WebContainer の非対応環境では出さないか、開けない旨を出す。要件 7.1）
+3. URL との連動を始める（5章）
+4. iframe の `load` で、中身の `document.title` を親ページのタイトルに写す（同じオリジンなので読める）
 
-### 4.2 ファイルツリー
+### 4.2 IDE モード
+
+最大化をやめると、レイアウトを IDE の形に変え（iframe は読み直さない）、`import()` で IDE モードの部分を読み込んで次を行う。
+
+1. ターミナル用フォントの読み込みを待ってから xterm.js を開く（Unicode 11 の文字幅を有効にする。9章）
+2. WebContainer を起動する（時間で打ち切り。要件 7.1）。API キーが必要なら `boot()` の前に `configureAPIKey()` を呼ぶ
+3. マウント用ファイル群を取得して作業ディレクトリにマウントする
+4. シェル（`jsh`）を起動し、現在の URL に対応するディレクトリへ `cd` した状態にする
+5. WebContainer の帰属表示を出す（必須。場所・文言は後で決める）
+
+- 最大化に戻すと、レイアウトだけを戻す。WebContainer とターミナルは動かしたままにする。2回目以降の切り替えは読み込みを伴わない。
+
+### 4.3 ファイルツリー
 
 - WebContainer のファイルシステムを読んで表示する（`fs.readdir`。変更は `fs.watch` で追従）。
 - 将来、projects の配下に入ったら、そのプロジェクトを起点にした表示に切り替える（要件 5.3）。
 
-## 5. URL・カレントディレクトリ・メインパネルの連動
+## 5. URL・iframe・カレントディレクトリの連動
 
-要件 5.4 の連動を、次の3つの経路で扱う。
+iframe の中身と親のパスの同期は、作者が過去に作った仕組みがある（要件 5.4）。以下は方針で、実装時にその実績と照合する。
+
+**基本の考え方: 履歴は iframe の移動で作り、親の URL は iframe に追従させる。**
+
+iframe の中の移動は、ブラウザの履歴（親と iframe で共通の履歴）に記録される。親でも `pushState` すると、1回の移動で履歴が2つ増え、戻るボタンの挙動がずれる。そのため、親の URL の更新は `replaceState` だけで行う。
 
 | きっかけ | 処理 |
 | --- | --- |
-| ターミナルで `cd` | カレントディレクトリの変化を検知 → URL を `history.pushState` で更新 → iframe を対応するページへ移動 |
-| メインパネル内のリンク | iframe の移動を検知（同じオリジンなので `load` イベントで `location` を読める）→ URL を更新 → ターミナルのカレントディレクトリを合わせる |
-| ブラウザの戻る・進む | `popstate` → iframe を移動 → カレントディレクトリを合わせる |
+| メインパネル内のリンク | iframe が移動する（履歴が1つ増える）→ iframe の `load` で中身の `location.pathname` を読み、親のパスに変換して `history.replaceState` → IDE モードならカレントディレクトリを合わせる |
+| ブラウザの戻る・進む | iframe が移動する → 以降は上と同じ |
+| ターミナルで `cd`（IDE モード） | カレントディレクトリの変化を検知 → iframe を `contentWindow.location.assign()` で移動する（履歴が1つ増える）→ 以降は上と同じ（ただしカレントディレクトリは合わせ直さない） |
 
 要検証（実装の初期に確かめる）:
 
+- **上の履歴の扱いが、主要ブラウザで想定どおりになるか**（作者の過去の実装と照合する）。
 - **`jsh` のカレントディレクトリの変化を、外から知る方法**。候補: (1) 自前の `cd` 関数やプロンプトで OSC 7 などのエスケープシーケンスを出させ、xterm.js 側で受け取る、(2) 入力されたコマンドを監視する、(3) WebContainer のプロセス情報から取得する。`jsh` がどこまで設定できるか（プロンプトや関数の定義）は未確認。
 - **ターミナルのカレントディレクトリを外から変える方法**（リンクで移動したとき）。シェルへ `cd …` を入力として送る方法が最も単純だが、ターミナルに入力が見える。見せるか隠すかは見た目と合わせて決める。
-- 連動が循環しない仕組み（`cd` → URL 更新 → iframe 移動 → 再び `cd`、とならないように、きっかけを区別する）。
+- 連動が循環しない仕組み（`cd` → iframe 移動 → 再び `cd`、とならないように、きっかけを区別する）。
 
 ## 6. 配信とヘッダー（Vercel）
 
 `vercel.json` で次を設定する。
 
-| 対象 | ヘッダー |
+| 対象 | 設定 |
 | --- | --- |
-| すべての HTML | `Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Embedder-Policy: require-corp`、`Strict-Transport-Security: max-age=31536000` |
-| ハッシュ付きの静的ファイル | `Cache-Control: public, max-age=31536000, immutable` |
+| すべての HTML | ヘッダー `Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Embedder-Policy: require-corp`、`Strict-Transport-Security: max-age=31536000` |
+| ハッシュ付きの静的ファイル | ヘッダー `Cache-Control: public, max-age=31536000, immutable` |
+| サイトのパス | 親ページを返す（全パス共通の1枚にする場合は `rewrites` で書き換える。10章） |
 
 - http から https へのリダイレクトは Vercel が行う。
-- 存在しないパスは Astro の 404 ページを返す。
 
 ## 7. 将来: projects（要件 5.3）
 
@@ -149,8 +170,8 @@ apps/
 | 種類 | 内容 |
 | --- | --- |
 | ビルド時の検証 | Content Collections のスキーマ検証（失敗でビルドを止める） |
-| ブラウザ（E2E） | Playwright で、最大化モードの表示、ヘッダーにより `crossOriginIsolated` が `true`、IDE モードへの切り替え、`cd` と URL・iframe の連動、戻る・進む |
-| ページ | 各ページが IDE なしで読めること（JavaScript を無効にしても内容が表示される） |
+| ブラウザ（E2E） | Playwright で、最大化モードの表示、ヘッダーにより `crossOriginIsolated` が `true`、IDE モードへの切り替え（iframe を読み直さないこと）、最大化に戻す、リンク移動と URL の連動、戻る・進む（履歴が1回の移動で1つだけ増えること）、`cd` と URL・iframe の連動 |
+| ページ | コンテンツのページが単体で読めること |
 
 ## 9. 技術検証の結果（2026-10-02）
 
@@ -181,12 +202,17 @@ apps/
 
 → ターミナルでは Unicode 11 の規則を有効にする（絵文字を2桁として扱うため）。結合した絵文字などは実装ごとに幅が食い違うが、curl の入口を廃止したため、制限は設けない。
 
-
 ## 10. 未決定・要検証
 
 | 項目 | 種類 |
 | --- | --- |
 | `jsh` のカレントディレクトリの検知と変更の方法（5章） | 要検証（実装の初期） |
+| 履歴の扱い（iframe で履歴を作り、親は `replaceState`）の確認（5章） | 要検証（作者の過去の実装と照合） |
+| 親ページを全パス共通の1枚にするか、パスごとに生成するか。パスごとのタイトル・OGP、存在しないパスに HTTP の 404 を返すかに関わる | 要件（6.1） |
+| 検索エンジンへの見せ方（コンテンツのページを検索結果に出すか、親ページの URL に寄せるか） | 要件（6.1） |
+| コンテンツのページを直接開いたときの扱い（親ページの URL へ移すか） | 要件（6.1） |
+| JavaScript が無効なときの扱い（親ページは CSR のため何も出ない） | 要件（6.1） |
+| コンテンツのページを置くパスの名前（`/_content/` は仮） | 要件（6.1） |
 | ディレクトリ構成・経歴の粒度・Content Collections のスキーマ | 要件（中身） |
 | 配色・レイアウト | 要件（見た目。後で決める） |
 | ターミナルの表示部品（xterm.js）の確定 | 要件（暫定） |
