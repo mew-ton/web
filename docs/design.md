@@ -76,7 +76,7 @@ apps/
 
 | 配信物 | パス（例） | 備考 |
 | --- | --- | --- |
-| 親ページ | `/`、`/works/` など | 全パス共通の1枚にするか、パスごとに生成するかは未決定（10章） |
+| 親ページ | `/`、`/works/` など | 全パス共通の1枚（`/index.html`）。`/` 以外は書き換えで同じ HTML を返す（6章） |
 | 親ページ・IDE のスクリプトなど | `/_ide/…`（ハッシュ付き） | IDE モードの部分は最大化をやめたときに読み込む |
 | コンテンツのページ | `/_content/`、`/_content/works/` など | Astro の出力 |
 | マウント用ファイル群 | `/_ide/fs.json` など | IDE モードの起動時に取得してマウントする |
@@ -96,13 +96,15 @@ apps/
 - コンテンツの正本は Content Collections（JSON ＋ スキーマ）。スキーマに合わない場合はビルドが失敗する。
 - アイコンは GitHub アカウントのアイコンをビルド時に取得して同梱し、自分のドメインから配信する（COEP の制約のため）。取得に失敗したらビルドを止める。
 - ページ間のリンクは、普通の相対リンク（iframe の中で移動する）。親ページとの連動は親ページ側で行う（5章）。
-- 親ページのことは知らない（ボタンや連動のスクリプトを持たない）。
+- 親ページのことは知らない（ボタンや連動のスクリプトを持たない）。JavaScript なしで描画できること（要件 6.1）。
+- 検索結果に出さない。全ページに `<meta name="robots" content="noindex, indexifembedded">` を付ける。`noindex` で単体では検索結果に出さず、`indexifembedded` で `/` の iframe に入った内容は `/` の内容として扱わせる（Google の仕様。出典は 10章の注）。
 
 ## 4. 親ページ（apps/shell）
 
 ### 4.1 最大化モード（初期表示）
 
-1. `location.pathname` を、コンテンツのページのパスに変換して（`/works/` → `/_content/works/`）、iframe を画面いっぱいに表示する
+1. `location.pathname` を、コンテンツのページのパスに変換して（`/works/` → `/_content/works/`）、iframe を作って画面いっぱいに表示する
+   - JavaScript が無効なときのために、HTML に `<noscript>` で `/_content/` を開く iframe を書いておく（要件 6.1）。JavaScript が有効なときは iframe をスクリプトで作るため、`/_content/` を読んでから別のページへ移る二重の読み込みは起きない
 2. 「最大化をやめる」ボタンを出す（WebContainer の非対応環境では出さないか、開けない旨を出す。要件 7.1）
 3. URL との連動を始める（5章）
 4. iframe の `load` で、中身の `document.title` を親ページのタイトルに写す（同じオリジンなので読める）
@@ -153,9 +155,11 @@ iframe の中の移動は、ブラウザの履歴（親と iframe で共通の�
 | --- | --- |
 | すべての HTML | ヘッダー `Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Embedder-Policy: require-corp`、`Strict-Transport-Security: max-age=31536000` |
 | ハッシュ付きの静的ファイル | ヘッダー `Cache-Control: public, max-age=31536000, immutable` |
-| サイトのパス | 親ページを返す（全パス共通の1枚にする場合は `rewrites` で書き換える。10章） |
+| サイトのパス | `rewrites` で `/` 以外のパス（`/_content/` と `/_ide/` を除く）を `/index.html` に書き換える。存在しないパスも同じ（iframe に 404 のページを出す。要件 7.2） |
+| `/` 以外の親ページ | ヘッダー `X-Robots-Tag: noindex`（検索結果に出すのは `/` だけ。要件 6.1） |
 
 - http から https へのリダイレクトは Vercel が行う。
+- タイトル・説明・OGP は親ページの HTML に1種類だけ書く。
 
 ## 7. 将来: projects（要件 5.3）
 
@@ -171,7 +175,8 @@ iframe の中の移動は、ブラウザの履歴（親と iframe で共通の�
 | --- | --- |
 | ビルド時の検証 | Content Collections のスキーマ検証（失敗でビルドを止める） |
 | ブラウザ（E2E） | Playwright で、最大化モードの表示、ヘッダーにより `crossOriginIsolated` が `true`、IDE モードへの切り替え（iframe を読み直さないこと）、最大化に戻す、リンク移動と URL の連動、戻る・進む（履歴が1回の移動で1つだけ増えること）、`cd` と URL・iframe の連動 |
-| ページ | コンテンツのページが単体で読めること |
+| JavaScript 無効 | 親ページを開くと iframe に `/` のコンテンツが表示されること。コンテンツのページが JavaScript なしで描画されること |
+| 検索エンジン向け | `/` だけが `noindex` でないこと（`/` 以外の親ページは `X-Robots-Tag`、コンテンツのページは `robots` メタタグ） |
 
 ## 9. 技術検証の結果（2026-10-02）
 
@@ -208,10 +213,8 @@ iframe の中の移動は、ブラウザの履歴（親と iframe で共通の�
 | --- | --- |
 | `jsh` のカレントディレクトリの検知と変更の方法（5章） | 要検証（実装の初期） |
 | 履歴の扱い（iframe で履歴を作り、親は `replaceState`）の確認（5章） | 要検証（作者の過去の実装と照合） |
-| 親ページを全パス共通の1枚にするか、パスごとに生成するか。パスごとのタイトル・OGP、存在しないパスに HTTP の 404 を返すかに関わる | 要件（6.1） |
-| 検索エンジンへの見せ方（コンテンツのページを検索結果に出すか、親ページの URL に寄せるか） | 要件（6.1） |
 | コンテンツのページを直接開いたときの扱い（親ページの URL へ移すか） | 要件（6.1） |
-| JavaScript が無効なときの扱い（親ページは CSR のため何も出ない） | 要件（6.1） |
+| `indexifembedded` の挙動を Google の公式ドキュメントで確認する（下の注） | 要確認 |
 | コンテンツのページを置くパスの名前（`/_content/` は仮） | 要件（6.1） |
 | ディレクトリ構成・経歴の粒度・Content Collections のスキーマ | 要件（中身） |
 | 配色・レイアウト | 要件（見た目。後で決める） |
@@ -221,3 +224,5 @@ iframe の中の移動は、ブラウザの履歴（親と iframe で共通の�
 | 帰属表示の場所・文言、API セッションの数え方 | 後で決める（要件 7.3） |
 | Noto Color Emoji（COLRv1）の Safari 対応 | 要検証 |
 | projects のプレビュー iframe と COOP / COEP の両立 | 要調査（将来） |
+
+注: `indexifembedded` は Google が 2022 年に追加した robots の指定で、`noindex` と組み合わせたときだけ働き、iframe などで埋め込まれた内容を埋め込み先のページの内容として索引に入れる。Google 以外の検索エンジンが対応しているかは未確認。出典は二次資料（[Search Engine Roundtable](https://www.seroundtable.com/googles-robots-tag-indexifembedded-32802.html)、[PPC Land](https://ppc.land/google-introduces-indexifembedded-to-embedded-content-indexation/)）。公式ドキュメント（developers.google.com の robots メタタグの解説）はこの環境から接続できず未確認。
