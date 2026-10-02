@@ -5,17 +5,17 @@
 
 ## 1. コンセプト
 
-入口は `curl mewton.jp`。ターミナルから叩くとプロフィールがテキストで返ってくる。
+入口は `curl https://mewton.jp`。ターミナルから叩くとプロフィールがテキストで返ってくる。http は使わない（7.1）。
 
-ブラウザで `mewton.jp` を開いた場合は、ブラウザ内で動くターミナル（WebContainer）を出すだけで、そこで同じように `curl mewton.jp` を叩いて読む。
+ブラウザで `mewton.jp` を開いた場合は、ブラウザ内で動くターミナル（WebContainer）を出すだけで、そこで同じように `curl https://mewton.jp` を叩いて読む。
 
 ```
-$ curl mewton.jp           # 目次
-$ curl mewton.jp/about     # 自己紹介・スキル・経歴
-$ curl mewton.jp/works     # 作ったものの一覧
-$ curl mewton.jp/works/foo # 主要作品の詳細
-$ curl mewton.jp/talks     # 執筆・登壇の一覧
-$ curl mewton.jp/contact   # 連絡先
+$ curl https://mewton.jp           # 目次
+$ curl https://mewton.jp/about     # 自己紹介・スキル・経歴
+$ curl https://mewton.jp/works     # 作ったものの一覧
+$ curl https://mewton.jp/works/foo # 主要作品の詳細
+$ curl https://mewton.jp/talks     # 執筆・登壇の一覧
+$ curl https://mewton.jp/contact   # 連絡先
 ```
 
 ## 2. 目的
@@ -109,18 +109,19 @@ $ curl mewton.jp/contact   # 連絡先
 - レスポンスに `Vary: Accept` を付け、CDN やキャッシュが HTML とテキストを取り違えないようにする。
 - テキストの応答には CORS ヘッダー（`Access-Control-Allow-Origin: *`）を付ける。ブラウザ内のターミナルが別オリジン扱いでリクエストする可能性があるため（7.2 の検証で要否を確認する）。
 - 出し分けがあるため、すべてを静的ファイルとして事前生成して配信する構成は取れない。サーバー（またはエッジ）で Nitro を動かす。
-- `curl mewton.jp` は `http://` でアクセスしてくる。curl は既定ではリダイレクトを追わないため、HTTPS へリダイレクトすると何も表示されない。そのため、サーバーは http で来ても https で来ても同じ内容を返す。
-- ブラウザを https へ移すのは、サーバーではなくブラウザ側のスクリプトで行う（WebContainer は HTTPS が必須のため）。サーバーでプロトコルを判定すると、判定方法がランタイムごとに異なり（7.4）、誤るとリダイレクトが無限に続くため。JavaScript が動かない環境では http のまま代替表示を読める。
-- HTML の応答に `Strict-Transport-Security` を付け、2回目以降のブラウザのアクセスは最初から https にする。ブラウザは https で受け取ったときだけこれに従い、curl は既定で使わないため、`curl mewton.jp` には影響しない。サブドメインには広げない（`includeSubDomains` は付けない）。
+- 通信は https に限る。http のリクエストはホスティング側で https へリダイレクトする。公開プロフィールでも、経路上での改ざんを防ぐことを入口の短さより優先する。
+- そのため `curl mewton.jp`（スキーム無し＝http）ではリダイレクトの応答が返るだけで本文は出ない。案内に表示する正式な叩き方は `curl https://mewton.jp` に統一する。`curl -L mewton.jp` でもリダイレクトを追って読める。
+- サーバー（アプリ）ではプロトコルを判定せず、リダイレクトもしない。判定方法がランタイムごとに異なるため（7.4）。
+- HTML の応答に `Strict-Transport-Security` を付け、2回目以降のブラウザのアクセスは最初から https にする。サブドメインには広げない（`includeSubDomains` は付けない）。
 
 ### 7.2 WebContainer を使うことによる制約
 
 | 制約 | 対応方針 |
 | --- | --- |
 | ページのクロスオリジン分離が必要（`Cross-Origin-Opener-Policy: same-origin` と `Cross-Origin-Embedder-Policy: require-corp`。パッケージ同梱の README で確認済み） | HTML の応答すべてに付ける。外部の画像や埋め込みは使わない方針なので、これによる問題はない |
-| HTTPS 必須（localhost を除く。同 README で確認済み） | ブラウザ側のスクリプトで https へ移る（7.1） |
+| HTTPS 必須（localhost を除く。同 README で確認済み） | サイト全体を https に限る（7.1） |
 | 実行時に StackBlitz のサーバー（stackblitz.com など）に依存する | 届かない場合 `boot()` は失敗も完了もしないため、20秒で打ち切って代替表示のままにする |
-| 標準の `curl` はある見込み（WebContainer API のチュートリアル環境のターミナルで使えたとの報告）。ただし、このサイト上で `curl mewton.jp`（スキーム無し＝`http`）が通るかは未検証。ブラウザ経由の通信なら https のページからの http 通信（混在コンテンツ）として遮断されうる | 起動時に標準の `curl` で実際にこのサイトを叩き、本文が返れば標準の `curl` を、失敗すれば自前の同名コマンド（https で取得）を使う |
+| 標準の `curl` はある見込み（WebContainer API のチュートリアル環境のターミナルで使えたとの報告）。ただし、このサイト上で `curl https://mewton.jp` が通るか（WebContainer 内の通信が CORS などで失敗しないか）は未検証 | 起動時に標準の `curl` で実際にこのサイトを叩き、本文が返れば標準の `curl` を、失敗すれば自前の同名コマンド（https で取得）を使う |
 | 対応ブラウザが限られる（スマートフォンを含む） | 非対応環境では6章の代替表示のまま見せる |
 | 起動時の読み込みが重い | 代替テキストを先に見せる（6章） |
 | ブラウザ向け JavaScript のバンドル | Nitro はブラウザ向けのコードをバンドルしないため、esbuild で別途ビルドして静的アセットとして配信する。COEP の制約で CDN からの読み込みは避ける |
@@ -128,7 +129,7 @@ $ curl mewton.jp/contact   # 連絡先
 
 ### 7.3 ブラウザでパスを開いたときの動き
 
-- ブラウザで `mewton.jp/works` などを直接開いた場合、ターミナルを起動して `curl mewton.jp/works` を自動で実行した状態にする。URL とターミナルに表示される内容を一致させるため。
+- ブラウザで `mewton.jp/works` などを直接開いた場合、ターミナルを起動して `curl https://mewton.jp/works` を自動で実行した状態にする。URL とターミナルに表示される内容を一致させるため。
 
 ### 7.4 ランタイムに依存しない作り
 
@@ -176,16 +177,16 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 
 1. Nitro をサーバーまたはエッジで実行できる（事前生成のみの静的ホスティングは不可。7.1）
 2. レスポンスヘッダーをアプリから設定できる（COOP / COEP / CORS / `Vary`）
-3. http のリクエストを https へ強制リダイレクトせず、アプリまで届ける（7.1）
+3. http のリクエストを https へリダイレクトできる（7.1）。アプリ側ではリダイレクトしないため、ホスティング側の機能で行う
 
 | 候補 | Nitro の preset | 条件3 | 評価 |
 | --- | --- | --- | --- |
-| Cloudflare Workers | `cloudflare-module` | 可。「Always Use HTTPS」はゾーン単位の設定で、オフにできる | **候補**。試作をこのランタイム（workerd）で動かし、Node.js と同じ応答になることを確認済み（11章）。ネームサーバーを Cloudflare に移す必要があり、稼働中のメール（mail / slmail サブドメイン）のレコード移行にリスクがある |
-| Fly.io | `node-server`（コンテナ） | 可。`force_https` は既定で `false` | **候補**。Node.js で動作確認済みの構成をそのまま載せられ、ネームサーバーはさくらのままでよい。常駐させる分の費用がかかる。共有 IPv4 で http / https の両方を受けられるかは要確認 |
+| Cloudflare Workers | `cloudflare-module` | 可（「Always Use HTTPS」） | **候補**。試作をこのランタイム（workerd）で動かし、Node.js と同じ応答になることを確認済み（11章）。ネームサーバーを Cloudflare に移す必要があり、稼働中のメール（mail / slmail サブドメイン）のレコード移行にリスクがある |
+| Fly.io | `node-server`（コンテナ） | 可（`force_https = true` にする。既定は `false`） | **候補**。Node.js で動作確認済みの構成をそのまま載せられ、ネームサーバーはさくらのままでよい。常駐させる分の費用がかかる |
 | VPS など＋`node-server` | `node-server` | 可（自前で設定） | 可能だが運用（OS 更新・証明書・監視）の負担が大きい |
 | Deno Deploy | `deno-deploy` | 未確認 | 公式情報を確認できていない |
-| Vercel | `vercel` | 不可。http → https のリダイレクトは無効化できない | 単独では除外。前段に http を通すプロキシ（Cloudflare など）を置けば使えるが、構成が二重になる |
-| Netlify | `netlify` | 不可。https 強制は無効化できない | 単独では除外（理由は Vercel と同じ） |
+| Vercel | `vercel` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
+| Netlify | `netlify` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
 
 > 各社の仕様は公式ドキュメントへ直接アクセスできなかったため、検索結果からの確認にとどまる。採用前に公式ドキュメントで再確認する。
 
@@ -193,16 +194,17 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 
 | 候補 | DNS の変更 | 影響 |
 | --- | --- | --- |
-| Cloudflare Workers | ネームサーバーをさくらから Cloudflare に変更する（独自ドメインで Workers を動かすにはゾーンを Cloudflare に置く必要がある） | 登録（レジストラ）はさくらのまま。以後 `mewton.jp` の全レコードを Cloudflare で管理するため、メール用（MX・SPF・DKIM・DMARC）を含む既存レコードを漏れなく移す。DNSSEC を有効にしている場合は切り替え前に無効化する。「Always Use HTTPS」と HSTS はゾーン全体の設定なので、他のサブドメインへの影響も確認する |
+| Cloudflare Workers | ネームサーバーをさくらから Cloudflare に変更する（独自ドメインで Workers を動かすにはゾーンを Cloudflare に置く必要がある） | 登録（レジストラ）はさくらのまま。以後 `mewton.jp` の全レコードを Cloudflare で管理するため、メール用（MX・SPF・DKIM・DMARC）を含む既存レコードを漏れなく移す。DNSSEC を有効にしている場合は切り替え前に無効化する。「Always Use HTTPS」はゾーン全体の設定なので、他のサブドメインへの影響も確認する |
 | Fly.io | ネームサーバーはさくらのまま。`mewton.jp` に A / AAAA レコードを追加するだけ | 既存レコードに影響しない。apex（`mewton.jp`）には CNAME を置けないため A / AAAA で指す。CAA レコードがある場合は Let's Encrypt を許可する |
+| Vercel / Netlify | ネームサーバーはさくらのまま。`mewton.jp` に各社指定の A レコードを追加する（要確認） | 既存レコードに影響しない |
 
 現状（2026-10-02 時点）: `mewton.jp`（apex）は未使用。`mail.mewton.jp` と `slmail.mewton.jp` でメールが稼働中。
 
 ## 10. 未決定事項
 
-- [ ] 本番ドメイン上で、標準の `curl` で `curl mewton.jp` が通るかの検証（7.2、11章）
+- [ ] 本番ドメイン上で、標準の `curl` で `curl https://mewton.jp` が通るかの検証（7.2、11章）
 - [ ] StackBlitz の利用規約の確認（7.2）
-- [ ] ホスティング先の決定（9.1。Cloudflare Workers と Fly.io で検討中）
+- [ ] ホスティング先の決定（9.1）
 - [ ] Markdown をテキストに整形する方法（試作では Markdown のまま出力）
 - [ ] ANSI の色・装飾を使うか（8.1）
 - [ ] About / Contact のデータ形式
@@ -219,8 +221,6 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | --- | --- |
 | `curl` に各パスの本文テキストが返る | 確認済み（`Content-Type: text/plain`、`Vary: Accept`、CORS ヘッダー付き） |
 | ブラウザ（`Accept: text/html`）に HTML が返る | 確認済み（COOP / COEP 付き、`crossOriginIsolated` が `true`） |
-| http で来ても curl にはそのまま本文を返す | 確認済み |
-| localhost 以外の http でブラウザが開くと、スクリプトで https へ移る | 確認済み（localhost では移らない） |
 | Cloudflare Workers のランタイム（workerd、`wrangler dev`）で Node.js と同じ応答になる | 確認済み（本文・ステータス・`Content-Type`・`Vary`・CORS・COOP / COEP・静的アセット、`crossOriginIsolated` が `true`） |
 | 本文の無い作品の詳細パスは 404 | 確認済み |
 | 全角を含む行の桁揃え | 確認済み（全角を2桁として計算） |
@@ -228,4 +228,4 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | WebContainer に届かないとき代替表示のまま案内を出す | 確認済み（20秒で打ち切り） |
 | コンテンツ検証でビルドが止まる | 確認済み（例: デザイン作品で外部リンクが無い） |
 | WebContainer に標準の `curl` があるか | チュートリアル環境では使えた（利用者の報告）。このサイトの環境では未確認 |
-| このサイト上で標準の `curl` で `curl mewton.jp` が通るか | **未検証**。検証環境から StackBlitz のサーバーに接続できないため。本番ドメインで開くと、ターミナル冒頭の `[diag]` 行に結果が出る（ローカル開発では常に自前の `curl` を使うため確認できない） |
+| このサイト上で標準の `curl` で `curl https://mewton.jp` が通るか | **未検証**。検証環境から StackBlitz のサーバーに接続できないため。本番ドメインで開くと、ターミナル冒頭の `[diag]` 行に結果が出る（ローカル開発では常に自前の `curl` を使うため確認できない） |

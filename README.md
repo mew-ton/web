@@ -1,6 +1,6 @@
 # web
 
-`curl mewton.jp` で読めるポートフォリオ。ブラウザで開くと、WebContainer のターミナル上で同じように `curl` して読める。
+`curl https://mewton.jp` で読めるポートフォリオ。ブラウザで開くと、WebContainer のターミナル上で同じように `curl` して読める。
 
 要件は [docs/requirements.md](docs/requirements.md)。
 

@@ -1,7 +1,12 @@
 import type { Site } from "./content";
-import { padEndWidth } from "./width";
+import { displayWidth, padEndWidth } from "./width";
 
 export type Page = { title: string; description: string; text: string };
+
+// 案内に表示する正式な叩き方。http は使わせない（要件書 7.1）
+export function siteCommand(host: string, path: string): string {
+  return `curl https://${host}${path === "/" ? "" : path}`;
+}
 
 function indent(text: string, n = 2): string {
   const pad = " ".repeat(n);
@@ -18,21 +23,26 @@ function page(title: string, description: string, lines: string[]): Page {
 
 export function renderPage(path: string, site: Site, host: string): Page | null {
   const { profile, works, talks } = site;
-  const cmd = (p: string) => `curl ${host}${p}`;
+  const cmd = (p: string) => siteCommand(host, p);
 
   switch (path) {
-    case "/":
+    case "/": {
+      const menu: [string, string][] = [
+        [cmd("/about"), "自己紹介・スキル・経歴"],
+        [cmd("/works"), "作ったもの"],
+        [cmd("/talks"), "執筆・登壇"],
+        [cmd("/contact"), "連絡先"],
+      ];
+      const width = Math.max(...menu.map(([c]) => displayWidth(c))) + 2;
       return page(profile.name, profile.tagline, [
         "",
         `  ${profile.name}`,
         `  ${profile.tagline}`,
         "",
-        `  ${padEndWidth(cmd("/about"), 28)}自己紹介・スキル・経歴`,
-        `  ${padEndWidth(cmd("/works"), 28)}作ったもの`,
-        `  ${padEndWidth(cmd("/talks"), 28)}執筆・登壇`,
-        `  ${padEndWidth(cmd("/contact"), 28)}連絡先`,
+        ...menu.map(([c, label]) => `  ${padEndWidth(c, width)}${label}`),
         "",
       ]);
+    }
 
     case "/about":
       return page(`About - ${profile.name}`, profile.tagline, [
@@ -103,5 +113,5 @@ export function renderPage(path: string, site: Site, host: string): Page | null 
 }
 
 export function notFoundPage(host: string): Page {
-  return page("Not Found", "ページが見つかりません", ["", "  404 Not Found", "", `  curl ${host}`, ""]);
+  return page("Not Found", "ページが見つかりません", ["", "  404 Not Found", "", `  ${siteCommand(host, "/")}`, ""]);
 }

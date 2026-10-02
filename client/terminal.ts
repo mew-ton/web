@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { CURL_SHIM } from "./curl-shim";
 
 const host = document.documentElement.dataset.siteHost!;
-const path = document.documentElement.dataset.path!;
+const command = document.documentElement.dataset.command!;
 const status = document.getElementById("status")!;
 const fallback = document.getElementById("fallback")!;
 const container = document.getElementById("terminal")!;
@@ -27,7 +27,7 @@ async function run(wc: WebContainer, command: string, args: string[]): Promise<{
 }
 
 // 試作用の診断。WebContainer 内の curl で実際にこのサイトを読めるかを確かめる（要件書 11章）
-// 標準の curl があっても、http のままの通信（混在コンテンツ）や CORS で失敗しうるため、実際に叩いて判定する
+// 標準の curl があっても、WebContainer 内の通信が CORS などで失敗しうるため、実際に叩いて判定する
 async function diagnose(wc: WebContainer): Promise<{ useShim: boolean; lines: string[] }> {
   const version = await run(wc, "curl", ["--version"]);
   const probe = await run(wc, "node", [
@@ -50,24 +50,15 @@ async function diagnose(wc: WebContainer): Promise<{ useShim: boolean; lines: st
     lines.push("curl コマンド : 自前（標準の curl が無い）");
     return { useShim: true, lines };
   }
-  // 利用者が打つのと同じ形（スキーム無し＝http）で叩く
-  const native = await run(wc, "curl", ["-s", `${host}/`]);
+  // 案内しているのと同じ形（https）で叩く
+  const native = await run(wc, "curl", ["-s", `https://${host}/`]);
   const nativeOk = native.exit === 0 && native.output.trim() !== "";
-  lines.push(`curl -s ${host}/ : exit ${native.exit} ${nativeOk ? "本文あり" : "本文なし"}`);
+  lines.push(`curl -s https://${host}/ : exit ${native.exit} ${nativeOk ? "本文あり" : "本文なし"}`);
   lines.push(`curl コマンド : ${nativeOk ? "WebContainer 標準" : "自前（標準の curl で読めない）"}`);
   return { useShim: !nativeOk, lines };
 }
 
-function isLocalhost(): boolean {
-  return ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-}
-
 async function main() {
-  // WebContainer は HTTPS が必須。サーバーではなくここで https へ移る（要件書 7.1）
-  if (location.protocol === "http:" && !isLocalhost()) {
-    location.replace(`https://${location.host}${location.pathname}${location.search}${location.hash}`);
-    return;
-  }
   if (!crossOriginIsolated) {
     setStatus("この環境ではターミナルを起動できないため、テキストで表示しています。");
     return;
@@ -126,7 +117,7 @@ async function main() {
 
   // 開いた URL と同じ内容を表示する（要件書 7.3）
   if (useShim) await input.write(`export PATH="${wc.workdir}/bin:$PATH"\n`);
-  await input.write(`curl ${host}${path === "/" ? "" : path}\n`);
+  await input.write(`${command}\n`);
   term.focus();
 }
 

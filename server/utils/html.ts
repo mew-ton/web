@@ -1,4 +1,4 @@
-import type { Page } from "./render";
+import { siteCommand, type Page } from "./render";
 
 function escape(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -7,14 +7,16 @@ function escape(s: string): string {
 // 代替表示の中のリンクを押せるようにする（要件書 6章）
 function linkify(text: string, host: string): string {
   const hostPattern = host.replace(/\./g, "\\.");
-  return escape(text)
-    .replace(/https?:\/\/[^\s<]+/g, (url) => `<a href="${url}">${url}</a>`)
-    .replace(new RegExp(`curl ${hostPattern}(/[\\w\\-/]*)?`, "g"), (all, p: string | undefined) => `<a href="${p ?? "/"}">${all}</a>`);
+  // サイト内を指す curl コマンドは相対リンクにする（ローカル開発でも本番へ飛ばないように）。それ以外の URL は外部リンク
+  const pattern = new RegExp(`(curl https://${hostPattern}(/[\\w\\-/]*)?)|(https?://[^\\s<]+)`, "g");
+  return escape(text).replace(pattern, (all, cmd?: string, p?: string) =>
+    cmd ? `<a href="${p ?? "/"}">${all}</a>` : `<a href="${all}">${all}</a>`,
+  );
 }
 
 export function renderHtml(page: Page, path: string, host: string): string {
   return `<!doctype html>
-<html lang="ja" data-site-host="${escape(host)}" data-path="${escape(path)}">
+<html lang="ja" data-site-host="${escape(host)}" data-command="${escape(siteCommand(host, path))}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,7 +42,7 @@ export function renderHtml(page: Page, path: string, host: string): string {
 <body>
 <main>
 <p id="status" role="status" aria-live="polite"></p>
-<pre id="fallback">${linkify(`$ curl ${host}${path === "/" ? "" : path}\n${page.text}`, host)}</pre>
+<pre id="fallback">${linkify(`$ ${siteCommand(host, path)}\n${page.text}`, host)}</pre>
 <div id="terminal" hidden></div>
 </main>
 <script type="module" src="/terminal.js"></script>

@@ -21,8 +21,7 @@ export default defineEventHandler(async (event) => {
     return (page ?? notFoundPage(siteHost)).text;
   }
 
-  // https への移動はサーバーでは行わない。プロトコルの判定がランタイムごとに異なり、
-  // 判定を誤るとリダイレクトが無限に続くため。ブラウザ側のスクリプトで移動する（要件書 7.1）
+  // http から https への移動はホスティング側で行う。サーバーではプロトコルを判定しない（要件書 7.4）
   setResponseHeaders(event, {
     "Content-Type": "text/html; charset=utf-8",
     "Cross-Origin-Opener-Policy": "same-origin",
