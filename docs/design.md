@@ -215,6 +215,9 @@ WebContainer の配信元（stackblitz.com など）にこの環境から接続�
   3. そのプロジェクトがまだマウントされていなければ、ファイル群を非同期で取得し、`mount(tree, { mountPoint: 'projects/<name>' })` でマウントする
   4. ファイルツリーをそのプロジェクトを起点にした表示に切り替え、メインパネルを README.md のプレビューにする
 - 取得中は、ディレクトリが空に見える。取得中であることの表示は見た目と合わせて決める。
+- 出るとき: API にアンマウントは無く、外すなら `fs.rm(path, { recursive: true })` で削除する。残すか削除するかは未決定（懸念事項）。
+  - 残す場合: 再び入ったときにすぐ表示でき、`npm install` の結果（`node_modules`）や動いているサーバーも保てる
+  - 懸念: WebContainer のファイルシステムがどの程度メモリを使うか分かっていない。ファイル数が多くメモリを圧迫するなら、出るたびに削除する必要がある（要調査）
   - 起動後に追加でマウントすることになる。`mount()` には `mountPoint`（マウント先のディレクトリ。事前に `fs.mkdir` で作っておく必要がある）があり、作業ディレクトリの一部へ後からマウントする使い方が想定されている。ただし、複数回呼べることや、既存のファイルと重なったときの挙動は公式ドキュメントに明記が無い（[API Reference `mount`](https://webcontainers.io/api#▸-mount)、[Working with the File System「Mounting to a different path」](https://webcontainers.io/guides/working-with-the-file-system#mounting-to-a-different-path)）。実機で確かめ、使えなければ `fs.mkdir` / `fs.writeFile` で書き込む。
 - メインパネルは README.md の Markdown プレビューに切り替える。
 - WebContainer の `server-ready` イベントで得た URL を、メインパネルの iframe に表示する。
@@ -276,5 +279,6 @@ WebContainer の配信元（stackblitz.com など）にこの環境から接続�
 | Noto Color Emoji（COLRv1）の Safari 対応 | 要検証 |
 | projects のプレビュー iframe と COOP / COEP の両立 | 要調査（将来） |
 | 起動後の追加の `mount()`（複数回・重なったときの挙動） | 要検証（将来。7章） |
+| projects から出るときに削除するか（WebContainer のメモリ使用量） | 懸念事項・要調査（将来。7章） |
 
 注: `indexifembedded` は Google が 2022 年に追加した robots の指定で、`noindex` と組み合わせたときだけ働き、iframe などで埋め込まれた内容を埋め込み先のページの内容として索引に入れる。Google 以外の検索エンジンが対応しているかは未確認。出典は二次資料（[Search Engine Roundtable](https://www.seroundtable.com/googles-robots-tag-indexifembedded-32802.html)、[PPC Land](https://ppc.land/google-introduces-indexifembedded-to-embedded-content-indexation/)）。公式ドキュメント（developers.google.com の robots メタタグの解説）はこの環境から接続できず未確認。
