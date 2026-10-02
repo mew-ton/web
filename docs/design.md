@@ -209,6 +209,7 @@ WebContainer の配信元（stackblitz.com など）にこの環境から接続�
 ## 7. 将来: projects（要件 5.3）
 
 - ソースはビルド時に集めて同梱し、`cd projects/<name>` したときに非同期で取得してマウントする。
+  - 起動後に追加でマウントすることになる。`mount()` には `mountPoint`（マウント先のディレクトリ。事前に `fs.mkdir` で作っておく必要がある）があり、作業ディレクトリの一部へ後からマウントする使い方が想定されている。ただし、複数回呼べることや、既存のファイルと重なったときの挙動は公式ドキュメントに明記が無い（[API Reference `mount`](https://webcontainers.io/api#▸-mount)、[Working with the File System「Mounting to a different path」](https://webcontainers.io/guides/working-with-the-file-system#mounting-to-a-different-path)）。実機で確かめ、使えなければ `fs.mkdir` / `fs.writeFile` で書き込む。
 - メインパネルは README.md の Markdown プレビューに切り替える。
 - WebContainer の `server-ready` イベントで得た URL を、メインパネルの iframe に表示する。
 - 要調査: WebContainer のプレビューを iframe で表示するときの COOP / COEP との両立。
@@ -268,5 +269,6 @@ WebContainer の配信元（stackblitz.com など）にこの環境から接続�
 | 帰属表示の場所・文言、API セッションの数え方 | 後で決める（要件 7.3） |
 | Noto Color Emoji（COLRv1）の Safari 対応 | 要検証 |
 | projects のプレビュー iframe と COOP / COEP の両立 | 要調査（将来） |
+| 起動後の追加の `mount()`（複数回・重なったときの挙動） | 要検証（将来。7章） |
 
 注: `indexifembedded` は Google が 2022 年に追加した robots の指定で、`noindex` と組み合わせたときだけ働き、iframe などで埋め込まれた内容を埋め込み先のページの内容として索引に入れる。Google 以外の検索エンジンが対応しているかは未確認。出典は二次資料（[Search Engine Roundtable](https://www.seroundtable.com/googles-robots-tag-indexifembedded-32802.html)、[PPC Land](https://ppc.land/google-introduces-indexifembedded-to-embedded-content-indexation/)）。公式ドキュメント（developers.google.com の robots メタタグの解説）はこの環境から接続できず未確認。
