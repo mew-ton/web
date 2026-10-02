@@ -1,0 +1,16 @@
+# About / Contact の内容（仮のデータ形式。要件書 8.2 で未決定）
+name: mewton
+tagline: （ここに一言プロフィール）
+about: |
+  （ここに自己紹介）
+skills:
+  - （スキル1）
+  - （スキル2）
+career:
+  - period: 20XX–
+    summary: （経歴1）
+contact:
+  - label: Email
+    value: （メールアドレス）
+  - label: GitHub
+    value: https://github.com/mew-ton

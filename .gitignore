@@ -141,3 +141,13 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Nitro
+.output/
+.nitro/
+public/terminal.js
+public/xterm.css
+.wrangler/
+.vercel/
+.netlify/
+dist/

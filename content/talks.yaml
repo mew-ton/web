@@ -1,0 +1,10 @@
+- kind: 登壇
+  title: （登壇タイトルのサンプル）
+  date: 2026-01-01
+  venue: （イベント名）
+  url: https://example.com/slides
+- kind: 記事
+  title: （記事タイトルのサンプル）
+  date: 2025-06-01
+  venue: （媒体名）
+  url: https://example.com/article

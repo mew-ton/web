@@ -1,0 +1,28 @@
+{
+  "name": "mewton-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:content": "node scripts/check-content.ts",
+    "build:client": "esbuild client/terminal.ts --bundle --format=esm --minify --outfile=public/terminal.js && cp node_modules/@xterm/xterm/css/xterm.css public/xterm.css",
+    "dev": "npm run build:client && nitro dev",
+    "build": "npm run check:content && npm run build:client && nitro build",
+    "start": "node .output/server/index.mjs",
+    "typecheck": "nitro prepare && tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "esbuild": "^0.28.2",
+    "nitropack": "^2.13.4",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@webcontainer/api": "^1.6.4",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "yaml": "^2.9.1"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
