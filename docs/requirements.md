@@ -180,8 +180,8 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 
 | 候補 | Nitro の preset | 条件3 | 評価 |
 | --- | --- | --- | --- |
-| Cloudflare Workers | `cloudflare-module` | 可。「Always Use HTTPS」はゾーン単位の設定で、オフにできる | **第一候補**。試作をこのランタイム（workerd）で動かし、Node.js と同じ応答になることを確認済み（11章）。`mewton.jp` の DNS を Cloudflare に移す必要がある。既存のレコード（メール用など）も移行する |
-| Fly.io | `node-server`（コンテナ） | 可。`force_https` は既定で `false` | **第二候補**。Node.js で動作確認済みの構成をそのまま載せられる。常駐させる分の費用がかかる |
+| Cloudflare Workers | `cloudflare-module` | 可。「Always Use HTTPS」はゾーン単位の設定で、オフにできる | **候補**。試作をこのランタイム（workerd）で動かし、Node.js と同じ応答になることを確認済み（11章）。ネームサーバーを Cloudflare に移す必要があり、稼働中のメール（mail / slmail サブドメイン）のレコード移行にリスクがある |
+| Fly.io | `node-server`（コンテナ） | 可。`force_https` は既定で `false` | **候補**。Node.js で動作確認済みの構成をそのまま載せられ、ネームサーバーはさくらのままでよい。常駐させる分の費用がかかる。共有 IPv4 で http / https の両方を受けられるかは要確認 |
 | VPS など＋`node-server` | `node-server` | 可（自前で設定） | 可能だが運用（OS 更新・証明書・監視）の負担が大きい |
 | Deno Deploy | `deno-deploy` | 未確認 | 公式情報を確認できていない |
 | Vercel | `vercel` | 不可。http → https のリダイレクトは無効化できない | 単独では除外。前段に http を通すプロキシ（Cloudflare など）を置けば使えるが、構成が二重になる |
@@ -194,13 +194,15 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | 候補 | DNS の変更 | 影響 |
 | --- | --- | --- |
 | Cloudflare Workers | ネームサーバーをさくらから Cloudflare に変更する（独自ドメインで Workers を動かすにはゾーンを Cloudflare に置く必要がある） | 登録（レジストラ）はさくらのまま。以後 `mewton.jp` の全レコードを Cloudflare で管理するため、メール用（MX・SPF・DKIM・DMARC）を含む既存レコードを漏れなく移す。DNSSEC を有効にしている場合は切り替え前に無効化する。「Always Use HTTPS」と HSTS はゾーン全体の設定なので、他のサブドメインへの影響も確認する |
-| Fly.io | ネームサーバーはさくらのまま。`mewton.jp` に A / AAAA レコードを追加するだけ | 既存レコードに影響しない。apex（`mewton.jp`）には CNAME を置けないため A / AAAA で指す |
+| Fly.io | ネームサーバーはさくらのまま。`mewton.jp` に A / AAAA レコードを追加するだけ | 既存レコードに影響しない。apex（`mewton.jp`）には CNAME を置けないため A / AAAA で指す。CAA レコードがある場合は Let's Encrypt を許可する |
+
+現状（2026-10-02 時点）: `mewton.jp`（apex）は未使用。`mail.mewton.jp` と `slmail.mewton.jp` でメールが稼働中。
 
 ## 10. 未決定事項
 
 - [ ] 本番ドメイン上で、標準の `curl` で `curl mewton.jp` が通るかの検証（7.2、11章）
 - [ ] StackBlitz の利用規約の確認（7.2）
-- [ ] ホスティング先の決定（9.1。第一候補は Cloudflare Workers）
+- [ ] ホスティング先の決定（9.1。Cloudflare Workers と Fly.io で検討中）
 - [ ] Markdown をテキストに整形する方法（試作では Markdown のまま出力）
 - [ ] ANSI の色・装飾を使うか（8.1）
 - [ ] About / Contact のデータ形式
