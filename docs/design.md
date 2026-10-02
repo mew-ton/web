@@ -313,6 +313,7 @@ curl の利用者の端末は選べない。以下は既知の情報に基づく
 ### 11.1 トップ（`apps/web` の `top.js`。ページを開いた時点で読み込む小さなスクリプト）
 
 - コピーボタン（`navigator.clipboard.writeText`）
+- WebContainer の帰属表示（Personal プランの条件。要件 7.5）を、ターミナルのパネルに表示する（文言・リンクは登録時の指定に従う）
 - 「ターミナルを開く」で `terminal.js` を動的に読み込み（`import()`。Vite がチャンクを分割する）、パネルを下から開く
 - `crossOriginIsolated` が `false` のとき、または非対応ブラウザでは「ターミナルを開く」を出さない
 
@@ -320,7 +321,7 @@ curl の利用者の端末は選べない。以下は既知の情報に基づく
 
 1. フォントの読み込みを待つ（8章）
 2. xterm.js を開く（`addon-unicode11` を有効化。7章）
-3. WebContainer を起動（20秒で打ち切り。要件 7.2）
+3. WebContainer を起動（20秒で打ち切り。要件 7.2）。Personal プランで API キーが必要な場合は、`boot()` の前に `configureAPIKey()` を呼ぶ（要件 7.5）
 4. `apps/container` が出力した `FileSystemTree` を取得し、作業ディレクトリにマウントする（`career.md` / `skills.md` / `talks.md` と代替コマンド。中身は `/career` などと同じ content の生成物）
 5. 標準の `curl` で `https://mewton.jp/` を叩いて確認し、使えなければ代替コマンドを `PATH` に置く（試作で実装済みの方式）
 6. `jsh` を起動し、最初の1回だけ候補 `curl https://mewton.jp` を表示する
@@ -351,6 +352,6 @@ curl の利用者の端末は選べない。以下は既知の情報に基づく
 | 本番で標準の `curl` が通るか | 要検証（本番で確認） |
 | `jsh` の Tab 補完と候補の干渉 | 要検証 |
 | 一般の端末の対応状況（10.3） | 要検証（実機） |
-| WebContainer API の利用にプランかライセンスが必要か | **未解決**（要件 7.5。改定規約では本番利用で必要と読める。結果次第でターミナルの設計を見直す） |
+| WebContainer API の Personal プランの帰属表示の指定・API キーの要否 | 要確認（要件 7.5。登録時に確認） |
 | ターミナルの表示部品（xterm.js）の確定 | 要件（暫定） |
 | 各段のライブラリ（4章の案） | 実装時に確定 |
