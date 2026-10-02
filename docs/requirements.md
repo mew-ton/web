@@ -195,7 +195,7 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | Deno Deploy | `deno-deploy` | 未確認 | 公式情報を確認できていない |
 | Vercel | `vercel` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
 | Netlify | `netlify` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
-| Void（VoidZero / Cloudflare） | なし（Nitro 単体は非対応。9.2） | 実行環境は Cloudflare Workers | 見送り。9.2 参照 |
+| Void（VoidZero / Cloudflare） | なし（Nitro 単体は非対応。9.2） | 未確認（実行環境は Cloudflare Workers） | 見送り。9.2 参照 |
 
 > 各社の仕様は公式ドキュメントへ直接アクセスできなかったため、検索結果からの確認にとどまる。採用前に公式ドキュメントで再確認する。
 
