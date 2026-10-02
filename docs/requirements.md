@@ -195,6 +195,7 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | Deno Deploy | `deno-deploy` | 未確認 | 公式情報を確認できていない |
 | Vercel | `vercel` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
 | Netlify | `netlify` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
+| Void（VoidZero / Cloudflare） | なし（Nitro 単体は非対応。9.2） | 実行環境は Cloudflare Workers | 見送り。9.2 参照 |
 
 > 各社の仕様は公式ドキュメントへ直接アクセスできなかったため、検索結果からの確認にとどまる。採用前に公式ドキュメントで再確認する。
 
@@ -207,6 +208,22 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | Vercel / Netlify | ネームサーバーはさくらのまま。`mewton.jp` に各社指定の A レコードを追加する（要確認） | 既存レコードに影響しない |
 
 現状（2026-10-02 時点）: `mewton.jp`（apex）は未使用。`mail.mewton.jp` と `slmail.mewton.jp` でメールが稼働中。
+
+### 9.2 Void の調査結果（2026-10-02）
+
+npm パッケージ `void` 0.22.0（VoidZero、現 Cloudflare 傘下。MIT）に同梱のドキュメントで確認した。公式サイトにはこの環境から接続できなかった。
+
+| 観点 | 内容 | 要件との関係 |
+| --- | --- | --- |
+| 実行環境 | Cloudflare Workers。自分の Cloudflare アカウントへ直接デプロイするか、Void のプラットフォーム（ホスト型の Void Cloud、またはチームで自前設置したもの）へデプロイする | ランタイムは workerd と同じで、試作の動作確認と同じ条件 |
+| 対応するアプリ | Vite 8 ＋ `voidPlugin()` が前提。Void アプリ（`routes/` の Hono ベース）、メタフレームワーク（TanStack Start / React Router / SvelteKit / Nuxt / Analog / Astro）、静的サイト | **Nitro 単体（Vite なし）は対応一覧に無い**。採用するなら Void アプリへの書き換えか Nuxt 化が必要で、7.4 の「Nitro を継続」と食い違う |
+| 独自ドメイン（自分の Cloudflare へ直接） | Workers の custom domain。ゾーンを自分の Cloudflare アカウントに置く必要がある | ネームサーバーの移行が必要。Cloudflare Workers と同じメールのリスク |
+| 独自ドメイン（Void Cloud） | CNAME（通信用）と TXT（所有確認）を外部 DNS に置く方式 | ネームサーバーはさくらのままでよいが、**apex（`mewton.jp`）には CNAME を置けない**。さくらの DNS が apex の別名（ALIAS など）に対応していなければ使えない（要確認） |
+| キャッシュ | ISR は設定したときだけ有効。キャッシュキーはパスとクエリで、`Accept` を含まない | ISR を有効にすると curl に HTML を返しうる。使うなら無効のまま（7.4 と同じ） |
+| 料金・提供状況 | Void Cloud は早期アクセス段階（検索結果より）。自分の Cloudflare へ直接デプロイする場合は Workers Free の範囲で動く | Void Cloud の料金・一般提供の時期は未確認 |
+| 囲い込み | 開発者自身が「Cloudflare と密に結びついている」と明言している | 「どこにでもデプロイできる」方針とは方向が逆 |
+
+結論: 現時点では見送る。Void を使っても apex で使う場合の DNS の問題（ネームサーバー移行か、apex に CNAME を置けない）は解決せず、Nitro からの書き換えも必要になるため。
 
 ## 10. 未決定事項
 
