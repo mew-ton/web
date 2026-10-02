@@ -180,7 +180,7 @@ $ curl https://mewton.jp/talks     # 執筆・登壇（ターミナルでは cat
 | 対応ブラウザが限られる（スマートフォンを含む） | 非対応環境では「ターミナルを開く」を出さないか、開けない旨を表示する。内容はトップと詳細のテキストで読める（6章） |
 | 起動時の読み込みが重い | ページを開いた時点では起動せず、ターミナルを開いたときに起動する。トップの情報は最初から表示されている（6章） |
 | ブラウザ向け JavaScript のバンドル | Web プロジェクト（Vite）でビルドし、Nitro が静的ファイルとして配信する。COEP の制約で CDN からの読み込みは避ける |
-| 利用条件 | 7.5 の調査結果を参照。個人ポートフォリオは商用ライセンス不要と判断できるが、明文で「個人利用は無料」とは書かれていない |
+| 利用条件 | 7.5 の調査結果を参照。**2026-09-22 改定の利用規約では「本番または商用での利用」に有効なプランかライセンスが必要と読め、個人ポートフォリオでも必要になる可能性がある（未解決）** |
 
 ### 7.3 ブラウザでパスを開いたときの動き
 
@@ -219,20 +219,37 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 
 注: 原稿のリポジトリ（stackblitz/webcontainer-docs）の最終更新は 2024-11-15。公開中のサイト（webcontainers.io）にはこの環境から接続できず、現行の文面と同一かは未確認。
 
-#### 一次情報では確認できなかったこと
+#### 利用規約（2026-09-22 改定版）で確認できたこと
 
-| 内容 | 状況 | 出典 |
+規約ページ（stackblitz.com）にはこの環境から接続できないため、規約の変更を追跡している公開リポジトリが保存した全文（2026-09-23 取得）で読んだ。
+
+| 内容 | 原文（抜粋） | 出典 |
 | --- | --- | --- |
-| 利用規約の本文 | 規約ページ（stackblitz.com）にこの環境から接続できず未確認。検索結果の要約によると、規約に「WebContainer API の利用はライセンスの区分・セッション数の上限などの制限（開発者ドキュメントと料金ページに記載）に従う」とあるとされる | [StackBlitz Terms of Service](https://stackblitz.com/terms-of-service) |
-| 無料の範囲の利用上限（リクエスト数・セッション数） | 上記の原稿には記載なし。検索結果の要約では「商用利用が多い場合、月 1 万リクエストを超える分に少額の課金」とされるが、一次情報で確認できていない | [WebContainer API is here.](https://blog.stackblitz.com/posts/webcontainer-api-is-here/)（未確認） |
-| 「個人利用は無料」という明記 | 原稿には無い。書かれているのは「商用・営利の本番利用にはライセンスが必要」という条件だけ | — |
+| 改定の時期 | "Published: September 14, 2026 \| Last updated: September 22, 2026 \| Effective for existing accounts: October 7, 2026" | [StackBlitz Terms of Service](https://stackblitz.com/terms-of-service)（全文の写し: [arcships/zdr-monitor `snapshots/f9a1769fbe2834f0.md`](https://github.com/arcships/zdr-monitor/blob/main/snapshots/f9a1769fbe2834f0.md)） |
+| WebContainer API も規約の対象サービスに含まれる | "“Services” means … the StackBlitz SDK, the WebContainer API, and any related tools, APIs, and features." | 同上 1.3 |
+| **本番または商用での利用には、有効なプランか別途の書面ライセンスが必要** | "(c) WebContainer API. Use of the WebContainer API is subject to the license tiers, session limits, and other usage limits stated in the developer documentation (currently at webcontainers.io) and on the Pricing Page. Use in a production or commercial setting, or beyond the stated limits, requires an active plan or separate written license that includes it; contact hello@stackblitz.com to discuss licensing." | 同上 1.5(c) |
+| 権利はプランかライセンスが有効な間だけ続く。開発者ドキュメントの上限は規約の一部になる | "(d) Duration; Documentation. The rights in this Section 1.5 continue only while the applicable plan or license is active … The usage limits and technical requirements stated in the developer documentation are incorporated into these Terms" | 同上 1.5(d) |
+| 料金ページが規約に組み込まれる | "Stackblitz offers the Services under free and paid subscription plans, with the plans, prices, features, usage allotments, and limits for each product described on the Pricing Page, which is incorporated into these Terms by this reference." | 同上 1.4 |
+| WebContainer API 経由の内容は AI 学習に使われない | "Content used solely through stackblitz.com or other non-Bolt Services, including … the WebContainer API, is not Bolt Model Development Content and is not used for the purposes described in Section 3.5." | 同上 1.3 |
 
-#### このサイトへの当てはめ
+注: 規約の写しは第三者のリポジトリによるもの。公開前に公式ページで原文を確認する。
 
-- 個人のポートフォリオで、営利事業ではなく、顧客・見込み客・従業員のニーズを満たすために使うものでもないため、**商用ライセンスは不要と判断する**。ただし「個人利用は無料」と明記されているわけではなく、条件に当たらないという解釈による。
-- 受託の宣伝や収益化を始める場合は、条件に当たりうるため見直す（Vercel のプランと同じ判断軸。9.1）。
-- 規約違反と判断されるとアクセスを止められうる。その場合もトップと詳細のテキストは WebContainer なしで読める（6章）ため、サイトの内容は失われない。
-- 公開前に、規約本文と無料の範囲の上限を公式ページで確認する。
+#### まだ確認できていないこと
+
+| 内容 | 状況 |
+| --- | --- |
+| 料金ページで、WebContainer API を含むプランとその価格・上限 | [stackblitz.com/pricing](https://stackblitz.com/pricing) にこの環境から接続できず未確認 |
+| 開発者ドキュメントにある現在のセッション数などの上限 | 原稿リポジトリ（2024-11 時点）には記載なし。現行の webcontainers.io は未確認 |
+| 「production（本番）」に個人の公開サイトが含まれるか | 規約に定義なし |
+
+#### このサイトへの当てはめ（2026-10-02 時点。未解決）
+
+- 以前の判断（ドキュメントの「商用・営利の本番利用にはライセンスが必要」から、個人ポートフォリオは不要とした判断）は、改定後の規約と食い違う。規約は「本番**または**商用」と書いており、商用でなくても、公開している本番サイトなら有効なプランかライセンスが必要と読める。
+- 規約とドキュメントが食い違う場合、規約が優先されると考えるのが妥当（ドキュメントの上限は規約に組み込まれるが、利用の可否そのものは規約 1.5(c) が定めている）。
+- 解決の手段:
+  1. 料金ページで、WebContainer API を含むプランと価格を確認する
+  2. hello@stackblitz.com に、個人の非営利ポートフォリオでの利用にプランが必要か問い合わせる
+- プランかライセンスが必要で、それを使わないと判断した場合、WebContainer をブラウザのターミナルに使う設計（5.5・7.2）を見直す必要がある。トップと詳細のテキストは WebContainer なしで読めるため（6章）、サイトの内容そのものは影響を受けない。
 
 ## 8. テキスト出力
 
@@ -385,8 +402,7 @@ npm パッケージ `void` 0.22.0（VoidZero、現 Cloudflare 傘下。MIT）に
 ## 10. 未決定事項
 
 - [ ] 本番ドメイン上で、標準の `curl` で `curl https://mewton.jp` が通るかの検証（7.2、11章）
-- [x] WebContainer API の商用ライセンスの要否を調査（7.5。個人ポートフォリオは不要と判断）
-- [ ] StackBlitz の利用規約の本文と、無料の範囲の上限を公式ページで確認（7.5）
+- [ ] **WebContainer API の利用にプランかライセンスが必要か（7.5。2026-09-22 改定の規約では「本番または商用」で必要と読める）**。料金ページの確認、または hello@stackblitz.com への問い合わせで解決する
 - [x] ホスティング先の決定（9.1。Vercel）
 - [ ] Vercel での本番確認（9.3 の確認項目）
 - [ ] Vercel のプラン（Hobby / Pro）の決定と、料金・利用条件の公式での確認（9.1）
