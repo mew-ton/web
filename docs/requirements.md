@@ -180,7 +180,7 @@ $ curl https://mewton.jp/talks     # 執筆・登壇（ターミナルでは cat
 | 対応ブラウザが限られる（スマートフォンを含む） | 非対応環境では「ターミナルを開く」を出さないか、開けない旨を表示する。内容はトップと詳細のテキストで読める（6章） |
 | 起動時の読み込みが重い | ページを開いた時点では起動せず、ターミナルを開いたときに起動する。トップの情報は最初から表示されている（6章） |
 | ブラウザ向け JavaScript のバンドル | Web プロジェクト（Vite）でビルドし、Nitro が静的ファイルとして配信する。COEP の制約で CDN からの読み込みは避ける |
-| 利用条件 | npm パッケージ `@webcontainer/api` 自体は MIT。ただし README に「利用すると StackBlitz の利用規約に同意したことになる」とあるため、個人ポートフォリオでの利用条件は規約で確認する（要確認） |
+| 利用条件 | 7.5 の調査結果を参照。個人ポートフォリオは商用ライセンス不要と判断できるが、明文で「個人利用は無料」とは書かれていない |
 
 ### 7.3 ブラウザでパスを開いたときの動き
 
@@ -204,6 +204,35 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 - 実行時にファイルシステムを読まない。コンテンツの生成物（Markdown・ANSI・トップの HTML）は Nitro の server assets としてビルド時に同梱する。トップの HTML は静的ファイルにしない（Vercel は静的ファイルを関数より先に返すため、`/` に置くと curl にも HTML が返る。詳細設計 2.3）。
 - 事前生成（prerender）や Nitro のキャッシュ（`routeRules` の `cache` / `swr` / `isr`）を使わない。出し分けの結果が固定されてしまうため。
 - サーバーの前に CDN やプロキシを置く場合、HTML 応答をキャッシュさせない。CDN によっては `Vary: Accept` を考慮せずにキャッシュし、curl に HTML を返してしまうため。
+
+### 7.5 WebContainer API の利用条件（調査: 2026-10-02）
+
+#### 一次情報で確認できたこと
+
+| 内容 | 原文（抜粋） | 出典 |
+| --- | --- | --- |
+| パッケージのライセンスは MIT | `"license": "MIT"` | npm パッケージ `@webcontainer/api` 1.6.4 の `package.json`（パッケージを取得して確認） |
+| 実行には StackBlitz のサービスが必要で、組み込むと利用規約に同意したことになる | "The WebContainer API relies on hosted proxies and server-side acceleration from StackBlitz to function properly. By integrating the WebContainer API into your project, you are agreeing to StackBlitz's standard Terms of Service." | 同パッケージの README、[npm](https://www.npmjs.com/package/@webcontainer/api) |
+| 商用ライセンスが必要なのは「商用・営利目的での本番利用」。試作・PoC は不要 | "Licensing is required for *production* usage of the API in a commercial, for-profit setting. (Prototypes or POCs do not require a commercial license.)" | [Commercial Usage](https://webcontainers.io/enterprise)（原稿: [stackblitz/webcontainer-docs `docs/enterprise.md`](https://github.com/stackblitz/webcontainer-docs/blob/main/docs/enterprise.md)） |
+| 判断の基準は「顧客・見込み客・従業員のニーズを満たすために使うか」。違反するとアクセスを止められうる | "If you're using the API to meet the needs of your customers, prospective customers, and/or employees, you need a license to ensure compliance with our Terms of Service. Usage of the API in violation of these terms may result in your access being revoked." | 同上 |
+| API キーは商用利用のためのもの。`boot()` の前に設定する | "Configure an API key to be used for commercial usage of the WebContainer API." / "This function will throw an exception if `WebContainer.boot` was called before `configureAPIKey`." | [API Reference `configureAPIKey`](https://webcontainers.io/api#configureapikey)（原稿: [`docs/api.md`](https://github.com/stackblitz/webcontainer-docs/blob/main/docs/api.md)）、[Changelog 1.3.0](https://webcontainers.io/changelog) |
+
+注: 原稿のリポジトリ（stackblitz/webcontainer-docs）の最終更新は 2024-11-15。公開中のサイト（webcontainers.io）にはこの環境から接続できず、現行の文面と同一かは未確認。
+
+#### 一次情報では確認できなかったこと
+
+| 内容 | 状況 | 出典 |
+| --- | --- | --- |
+| 利用規約の本文 | 規約ページ（stackblitz.com）にこの環境から接続できず未確認。検索結果の要約によると、規約に「WebContainer API の利用はライセンスの区分・セッション数の上限などの制限（開発者ドキュメントと料金ページに記載）に従う」とあるとされる | [StackBlitz Terms of Service](https://stackblitz.com/terms-of-service) |
+| 無料の範囲の利用上限（リクエスト数・セッション数） | 上記の原稿には記載なし。検索結果の要約では「商用利用が多い場合、月 1 万リクエストを超える分に少額の課金」とされるが、一次情報で確認できていない | [WebContainer API is here.](https://blog.stackblitz.com/posts/webcontainer-api-is-here/)（未確認） |
+| 「個人利用は無料」という明記 | 原稿には無い。書かれているのは「商用・営利の本番利用にはライセンスが必要」という条件だけ | — |
+
+#### このサイトへの当てはめ
+
+- 個人のポートフォリオで、営利事業ではなく、顧客・見込み客・従業員のニーズを満たすために使うものでもないため、**商用ライセンスは不要と判断する**。ただし「個人利用は無料」と明記されているわけではなく、条件に当たらないという解釈による。
+- 受託の宣伝や収益化を始める場合は、条件に当たりうるため見直す（Vercel のプランと同じ判断軸。9.1）。
+- 規約違反と判断されるとアクセスを止められうる。その場合もトップと詳細のテキストは WebContainer なしで読める（6章）ため、サイトの内容は失われない。
+- 公開前に、規約本文と無料の範囲の上限を公式ページで確認する。
 
 ## 8. テキスト出力
 
@@ -356,7 +385,8 @@ npm パッケージ `void` 0.22.0（VoidZero、現 Cloudflare 傘下。MIT）に
 ## 10. 未決定事項
 
 - [ ] 本番ドメイン上で、標準の `curl` で `curl https://mewton.jp` が通るかの検証（7.2、11章）
-- [ ] StackBlitz の利用規約の確認（7.2）
+- [x] WebContainer API の商用ライセンスの要否を調査（7.5。個人ポートフォリオは不要と判断）
+- [ ] StackBlitz の利用規約の本文と、無料の範囲の上限を公式ページで確認（7.5）
 - [x] ホスティング先の決定（9.1。Vercel）
 - [ ] Vercel での本番確認（9.3 の確認項目）
 - [ ] Vercel のプラン（Hobby / Pro）の決定と、料金・利用条件の公式での確認（9.1）
