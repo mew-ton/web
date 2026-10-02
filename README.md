@@ -37,3 +37,9 @@ Nitro の preset を切り替えると、同じコードを別のランタイム
 NITRO_PRESET=cloudflare-module npm run build
 npx wrangler dev .output/server/index.mjs --assets .output/public --compatibility-flags nodejs_compat
 ```
+
+```sh
+# Vercel / Netlify 向け（出力先はそれぞれ .vercel/ と .netlify/ + dist/）
+NITRO_PRESET=vercel npm run build
+NITRO_PRESET=netlify npm run build
+```

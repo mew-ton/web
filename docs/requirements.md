@@ -193,8 +193,8 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | Fly.io | `node-server`（コンテナ） | 可（`force_https = true` にする。既定は `false`） | **候補**。Node.js で動作確認済みの構成をそのまま載せられ、ネームサーバーはさくらのままでよい。常駐させる分の費用がかかる |
 | VPS など＋`node-server` | `node-server` | 可（自前で設定） | 可能だが運用（OS 更新・証明書・監視）の負担が大きい |
 | Deno Deploy | `deno-deploy` | 未確認 | 公式情報を確認できていない |
-| Vercel | `vercel` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
-| Netlify | `netlify` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。このランタイムでの動作は未確認 |
+| Vercel | `vercel` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。関数としての応答は Node.js と一致を確認済み（11章） |
+| Netlify | `netlify` | 可（常に https へリダイレクトされる） | **候補**。ネームサーバーはさくらのままでよい見込み。関数としての応答は Node.js と一致を確認済み（11章） |
 | Void（VoidZero / Cloudflare） | なし（Nitro 単体は非対応。9.2） | 未確認（実行環境は Cloudflare Workers） | 見送り。9.2 参照 |
 
 > 各社の仕様は公式ドキュメントへ直接アクセスできなかったため、検索結果からの確認にとどまる。採用前に公式ドキュメントで再確認する。
@@ -247,6 +247,8 @@ npm パッケージ `void` 0.22.0（VoidZero、現 Cloudflare 傘下。MIT）に
 | `curl` に各パスの本文テキストが返る | 確認済み（`Content-Type: text/plain`、`Vary: Accept`、CORS ヘッダー付き） |
 | ブラウザ（`Accept: text/html`）に HTML が返る | 確認済み（COOP / COEP 付き、`crossOriginIsolated` が `true`） |
 | Cloudflare Workers のランタイム（workerd、`wrangler dev`）で Node.js と同じ応答になる | 確認済み（本文・ステータス・`Content-Type`・`Vary`・CORS・COOP / COEP・静的アセット、`crossOriginIsolated` が `true`） |
+| Vercel（`vercel` preset）・Netlify（`netlify` preset）の関数が Node.js と同じ応答になる | 確認済み（2026-10-02）。9パス × curl / ブラウザの 18 通りで、ステータス・主要ヘッダー・本文が Node.js / Cloudflare Workers / Vercel / Netlify の4つで一致。各社が関数を呼ぶ形（Vercel は Node.js の `(req, res)`、Netlify は `Request` → `Response`）で手元から呼び出した。各社の配信層（静的ファイル配信、https へのリダイレクト、CDN）はこの環境から接続できないため未確認 |
+| Netlify の preset が付けるキャッシュヘッダー | ISR を設定したパスにだけ付く（preset のコードで確認）。ISR を使わない方針（7.4）なので付かない |
 | 本文の無い作品の詳細パスは 404 | 確認済み |
 | 全角を含む行の桁揃え | 確認済み（全角を2桁として計算） |
 | 代替表示のリンクで各パスへ移動できる | 確認済み |
