@@ -6,25 +6,25 @@
 
 ## 1. 全体構成
 
+Vite+（`vite-plus`）で管理するモノレポにし、役割ごとにプロジェクトを分ける（2026-10-02）。
+
+| プロジェクト | 場所 | 役割 | 主な技術 |
+| --- | --- | --- | --- |
+| コンテンツ（共有） | `packages/content` | 正本 JSON・JSON Schema・検証・文書モデル・各形式への変換・桁幅・アイコンの変換 | TypeScript |
+| サーバー | `apps/server` | 配信と出し分け（パスと `Accept` で、ビルド済みの応答を選んで返す） | Nitro |
+| Web | `apps/web` | ブラウザ向けの HTML・CSS・JS（トップとターミナル） | Vite、xterm.js、WebContainer API |
+| コンテナ | `apps/container` | WebContainer にマウントするファイル群（`career.md` などと、`curl` の代替コマンド。将来は作品フォルダ） | TypeScript |
+
 ```
-┌──────────────────────── ビルド時（Vercel のビルド環境 / 手元） ────────────────────────┐
-│                                                                                         │
-│  content/site.json ──▶ 検証(JSON Schema・絵文字・桁幅) ──▶ 文書モデル ─┬─▶ *.md          │
-│  (SSOT)                                                              ├─▶ *.ansi (curl用) │
-│                                                                      └─▶ index.html     │
-│  GitHub アイコン ──▶ 取得 ──▶ PNG(トップ用) ／ ANSI ハーフブロック(curl用)               │
-│  フォント原本 ──▶ サブセット(トップ用・絵文字) ／ そのまま(ターミナル用)                  │
-│  client/ ──▶ esbuild ──▶ top.js(小) ／ terminal.js(遅延読み込み)                         │
-│                                                                                         │
-│                          すべて Nitro に同梱（server assets / public）                   │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-┌──────────────────────────── 実行時（Nitro。Vercel の関数） ──────────────────────────────┐
-│  リクエスト ──▶ パスと Accept で、ビルド済みの応答を選んで返すだけ（生成しない）          │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-┌──────────────────────────────── ブラウザ ───────────────────────────────────────────────┐
-│  トップ（HTML＋top.js） ──「ターミナルを開く」──▶ terminal.js を読み込み                  │
-│      ──▶ フォント読み込み ──▶ xterm.js ──▶ WebContainer 起動 ──▶ *.md を配置 ──▶ jsh     │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
+                    packages/content（正本 JSON → 検証 → 文書モデル）
+                     │ md / ansi           │ HTML 断片・アイコン PNG・文字一覧   │ md
+                     ▼                     ▼                                    ▼
+              apps/server            apps/web（Vite）                    apps/container
+              （Nitro）                │ index.html                        │ マウント用ファイル群
+                 ▲   ▲                 │ top.js / terminal.js / CSS / fonts│ （FileSystemTree）
+                 │   └── server assets ┘ static ──────────────┐            │ static
+                 │                                            ▼            ▼
+                 └──────────────── Nitro の出力（Vercel にデプロイ）◀──────┘
 ```
 
 ターミナルの表示には xterm.js を使う前提で設計する（要件 7章で有力候補として暫定）。
@@ -32,37 +32,76 @@
 方針:
 
 - **生成はすべてビルド時**に行い、実行時はビルド済みの応答を選んで返すだけにする（要件 7.4「実行時にファイルを読まない」「キャッシュを使わない」と一致）。
+- **生成処理は `packages/content` に一本化**する。サーバー・Web・コンテナの各プロジェクトは、その生成物を使うだけで、独自に生成しない（3つの出力の食い違いを防ぐため）。
 - **ランタイム非依存**: サーバーのコードは Nitro の標準 API（h3）だけを使い、判定に使うのはリクエストヘッダーのみ。
+- **最終的な配信物は Nitro の出力1つ**にまとめる。Web とコンテナのビルド結果は、Nitro が静的ファイルまたは server assets として取り込む（2.3）。
 
-## 2. ディレクトリ構成
+## 2. モノレポ構成
+
+### 2.1 ディレクトリ
 
 ```
-content/
-  site.json              # コンテンツの正本（SSOT）
-  site.schema.json       # JSON Schema
-assets/
-  fonts/                 # フォント原本（OFL。ライセンス文を同梱）
-build/                   # ビルドスクリプト（TypeScript）
-  index.ts               # ビルドの入口（下記 4章の手順を順に実行）
-  validate.ts
-  document.ts            # 文書モデルと各形式への変換
-  render-markdown.ts
-  render-ansi.ts
-  render-html.ts
-  icon.ts
-  fonts.ts
-  width.ts               # 桁幅の計算（xterm.js と同じ規則。7章）
-server/
-  routes/[...path].ts    # 出し分けだけを行う
-  utils/responses.ts     # ビルド済みの応答の参照
-client/
-  top.ts                 # コピーボタン・パネル開閉・terminal.js の遅延読み込み
-  terminal/
-    index.ts             # ターミナルの起動
-    suggestion.ts        # 候補（ゴーストテキスト）
-    curl-shim.ts         # 標準 curl が使えない場合の代替
-.generated/              # ビルド生成物（git 管理外）。Nitro の server assets / public の入力
+vite.config.ts           # Vite+ のルート設定（lint・fmt・タスク）
+pnpm-workspace.yaml
+packages/
+  content/
+    site.json            # コンテンツの正本（SSOT）
+    site.schema.json     # JSON Schema
+    src/
+      validate.ts
+      document.ts        # 文書モデル
+      render-markdown.ts
+      render-ansi.ts
+      render-html.ts     # トップの HTML 断片
+      icon.ts            # アイコンの取得と変換
+      width.ts           # 桁幅（xterm.js と同じ規則。7章）
+    dist/                # 生成物（git 管理外）
+apps/
+  server/                # Nitro
+    routes/[...path].ts  # 出し分けだけを行う
+    nitro.config.ts
+  web/                   # Vite
+    index.html           # トップのテンプレート（content の HTML 断片を差し込む）
+    src/
+      top.ts             # コピーボタン・パネル開閉・ターミナルの遅延読み込み
+      terminal/          # 遅延読み込みされるチャンク
+        index.ts
+        suggestion.ts    # 候補（ゴーストテキスト）
+    fonts/               # フォント原本（OFL。ライセンス文を同梱）
+    vite.config.ts
+  container/
+    files/               # マウントするファイルの元（固定のもの）
+    src/
+      curl-shim.ts       # 標準 curl が使えない場合の代替
+      build.ts           # content の md と files/ をまとめ、FileSystemTree を出力
 ```
+
+### 2.2 ツール
+
+- **Vite+**（`vite-plus` 1.0.0、MIT）: lint（Oxlint）・フォーマット（Oxfmt）・テスト（Vitest）・タスク実行（`vp run`）をルートの `vite.config.ts` でまとめて管理する。Vite 8 を含む。
+- **パッケージマネージャー**: pnpm（workspaces）。Vite+ は既存のパッケージマネージャーを検出して使う仕組みのため、別途必要。
+- Node.js: 22.18 以上（Vite+ の要件 `^22.18.0 || ^24.11.0 || >=26.0.0` に合わせる）。
+
+### 2.3 ビルドの順序と受け渡し
+
+`vp run build` のタスク依存（`dependsOn`）で次の順に実行する。
+
+1. `packages/content`: 検証 → 文書モデル → `*.md`・`*.ansi`・トップの HTML 断片・アイコン（PNG と ANSI）・トップに出る文字の一覧を `dist/` に出力
+2. `apps/web` と `apps/container`（並行）
+   - web: Vite でビルド。`index.html` に content の HTML 断片を差し込み、フォントをサブセット化（8章）し、`top.js` と遅延読み込みの `terminal.js` を出力
+   - container: content の `*.md` と代替コマンドを WebContainer の `FileSystemTree`（JSON）にまとめて出力
+3. `apps/server`: Nitro でビルド。次のように取り込む
+
+| 取り込むもの | Nitro での扱い | 理由 |
+| --- | --- | --- |
+| content の `*.md` / `*.ansi` / トップの ANSI | server assets | 出し分けて返すため |
+| web の `index.html` | **server assets**（静的ファイルにしない） | Vercel は静的ファイルを関数より先に返す。`/` に `index.html` を静的に置くと curl にも HTML が返り、出し分けが壊れるため |
+| web の JS・CSS・フォント・アイコン | 静的ファイル（`publicAssets`） | ハッシュ付きファイル名で長期キャッシュ |
+| container の `FileSystemTree` | 静的ファイル | ターミナルを開いたときに取得してマウントする |
+
+### 2.4 開発時
+
+- 要検討: 開発時の構成（Vite の開発サーバーと Nitro の開発サーバーをどうつなぐか）。WebContainer のため、開発サーバーでも COOP / COEP ヘッダーを付ける必要がある（Vite は `server.headers` で設定できる）。
 
 ## 3. コンテンツ（SSOT）
 
@@ -103,17 +142,17 @@ client/
 
 ## 4. ビルド手順
 
-`npm run build` で次を順に実行し、最後に `nitro build` を行う。
+2.3 の順序で実行する。各段で使うライブラリ（案。実装時に確定）:
 
-1. `content/site.json` を検証（3.2）
-2. GitHub アイコンを取得（`https://github.com/<github>.png?size=…`）。失敗したらビルドを止める（要件 8.2）
-3. 文書モデルを組み立て、`*.md`・`*.ansi`・`index.html` を生成（5章）
-4. アイコンを PNG（トップ用）と ANSI ハーフブロック（curl 用）に変換（6章）
-5. フォントを用意（8章）
-6. `client/` を esbuild でバンドル（`top.js` と、遅延読み込みの `terminal.js`）
-7. 生成物を `.generated/` に出力し、`nitro build`
+| 段 | ライブラリ | 用途 |
+| --- | --- | --- |
+| content | `ajv` | JSON Schema による検証 |
+| content | `sharp` | アイコン画像の縮小と画素の読み取り |
+| content | `@xterm/headless` ＋ `@xterm/addon-unicode11` | 桁幅の計測（7章） |
+| web | Vite（Vite+ に同梱） | バンドル・HTML の生成 |
+| web | `subset-font` | フォントのサブセット化 |
 
-使うライブラリ（案）: `ajv`（検証）、`sharp`（画像）、`subset-font`（フォントのサブセット）、`@xterm/headless` ＋ `@xterm/addon-unicode11`（桁幅。7章）、`esbuild`。
+- GitHub アイコンの取得（`https://github.com/<github>.png?size=…`）に失敗したらビルドを止める（要件 8.2）。
 
 ## 5. 文書モデルと出力
 
@@ -184,12 +223,12 @@ type Block =
 
 | 用途 | 原本 | 加工 | 配信 |
 | --- | --- | --- | --- |
-| トップの文章 | M PLUS 1 | トップに出る文字だけにサブセット | `/fonts/…`（ハッシュ付きファイル名） |
+| トップの文章 | M PLUS 1 | トップに出る文字だけにサブセット（文字一覧は content が出力） | web のビルドで出力（ハッシュ付きファイル名） |
 | トップのコマンド | M PLUS 1 Code | トップに出る文字だけにサブセット | 同上 |
 | ターミナル（等幅） | M PLUS 1 Code | 加工しない（フルサイズ） | 同上。ターミナルを開いたときに読み込む |
 | ターミナル（絵文字） | Noto Color Emoji | コンテンツで使う絵文字だけにサブセット | 同上 |
 
-- 原本は `assets/fonts/` にリポジトリで管理する（OFL ライセンス文を同梱）。ビルドのたびに外部から取得しない（ビルドの再現性のため）。
+- 原本は `apps/web/fonts/` にリポジトリで管理する（OFL ライセンス文を同梱）。ビルドのたびに外部から取得しない（ビルドの再現性のため）。
 - ターミナルは `document.fonts.load()` でフォントの読み込みを待ってから xterm.js を開く（xterm.js は起動時にセル幅を計測するため）。
 - 要確認: Noto Color Emoji（COLRv1）の Safari での表示（要件 9.4）。
 
@@ -199,9 +238,9 @@ type Block =
 
 | パス | `Accept` に `text/html` を含む | 含まない（curl など） |
 | --- | --- | --- |
-| `/` | `index.html` | トップの ANSI テキスト |
+| `/` | `index.html`（server assets から返す。2.3） | トップの ANSI テキスト |
 | `/career` `/skills` `/talks` | `*.md`（`text/plain`） | `*.ansi`（`text/plain`） |
-| `/fonts/*` `/icon.*` `/assets/*` | 静的ファイル（Vercel の配信層が関数より先に返す） | 同左 |
+| web の JS・CSS・フォント・アイコン、container の `FileSystemTree` | 静的ファイル（Vercel の配信層が関数より先に返す） | 同左 |
 | その他 | 404（HTML） | 404（テキスト） |
 
 ### 9.2 応答ヘッダー
@@ -262,18 +301,18 @@ curl の利用者の端末は選べない。以下は既知の情報に基づく
 
 ## 11. ブラウザ側
 
-### 11.1 トップ（`top.js`。ページを開いた時点で読み込む小さなスクリプト）
+### 11.1 トップ（`apps/web` の `top.js`。ページを開いた時点で読み込む小さなスクリプト）
 
 - コピーボタン（`navigator.clipboard.writeText`）
-- 「ターミナルを開く」で `terminal.js` を動的に読み込み（`import()`）、パネルを下から開く
+- 「ターミナルを開く」で `terminal.js` を動的に読み込み（`import()`。Vite がチャンクを分割する）、パネルを下から開く
 - `crossOriginIsolated` が `false` のとき、または非対応ブラウザでは「ターミナルを開く」を出さない
 
-### 11.2 ターミナル（`terminal.js`。開いたときに読み込む）
+### 11.2 ターミナル（`apps/web` の `terminal.js`。開いたときに読み込む）
 
 1. フォントの読み込みを待つ（8章）
 2. xterm.js を開く（`addon-unicode11` を有効化。7章）
 3. WebContainer を起動（20秒で打ち切り。要件 7.2）
-4. 作業ディレクトリに `career.md` / `skills.md` / `talks.md` を配置する。中身はビルド時に `terminal.js` と一緒に出力したもの（`/career` などと同じ生成物）を使う
+4. `apps/container` が出力した `FileSystemTree` を取得し、作業ディレクトリにマウントする（`career.md` / `skills.md` / `talks.md` と代替コマンド。中身は `/career` などと同じ content の生成物）
 5. 標準の `curl` で `https://mewton.jp/` を叩いて確認し、使えなければ代替コマンドを `PATH` に置く（試作で実装済みの方式）
 6. `jsh` を起動し、最初の1回だけ候補 `curl https://mewton.jp` を表示する
 
@@ -305,3 +344,5 @@ curl の利用者の端末は選べない。以下は既知の情報に基づく
 | 一般の端末の対応状況（10.3） | 要検証（実機） |
 | StackBlitz の利用規約 | 要確認 |
 | ターミナルの表示部品（xterm.js）の確定 | 要件（暫定） |
+| 開発時の構成（Vite と Nitro の開発サーバーのつなぎ方） | 設計（2.4） |
+| 各段のライブラリ（4章の案） | 実装時に確定 |

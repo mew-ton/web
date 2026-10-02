@@ -146,7 +146,8 @@ $ curl https://mewton.jp/talks     # 執筆・登壇（ターミナルでは cat
 | サーバー | Nitro | トップはリクエストに応じてテキスト / HTML を出し分け、詳細はテキストを返す（7.1） |
 | ブラウザのターミナル（実行環境） | WebContainer API | ブラウザ内でシェルを動かす（7.2） |
 | ブラウザのターミナル（表示） | xterm.js（有力候補。2026-10-02 時点で暫定） | WebContainer は画面を持たないため、シェルの出力（制御文字）を解釈して描画し、キー入力を渡すターミナルエミュレーターが必要。ブラウザ向けの定番で、装飾・文字幅の検証もこれで行った（詳細設計 10章）。他を選ぶ場合は文字幅の基準（詳細設計 7章）を検証し直す |
-| HTML の生成 | Nitro 単体 | UI フレームワークは使わない。トップとターミナルパネルを持つ1枚の HTML を組み立てる |
+| ブラウザ向けの HTML・CSS・JS | Vite（モノレポ内の別プロジェクト） | トップとターミナルパネル。UI フレームワークは使わない。Nitro は配信と出し分けだけを担う（詳細設計 1・2章） |
+| モノレポ | Vite+（pnpm workspaces） | サーバー（Nitro）・Web（Vite）・コンテナにマウントするファイル群・共有のコンテンツ生成の4プロジェクト（詳細設計 2章） |
 | コンテンツ管理 | JSON（SSOT） | 8.2。CMS は将来検討 |
 
 ### 7.1 テキストと HTML の出し分け
@@ -178,7 +179,7 @@ $ curl https://mewton.jp/talks     # 執筆・登壇（ターミナルでは cat
 | 標準の `curl` はある見込み（WebContainer API のチュートリアル環境のターミナルで使えたとの報告）。ただし、このサイト上で `curl https://mewton.jp` が通るか（WebContainer 内の通信が CORS などで失敗しないか）は未検証 | 起動時に標準の `curl` で実際にこのサイトを叩き、本文が返れば標準の `curl` を、失敗すれば自前の同名コマンド（https で取得）を使う |
 | 対応ブラウザが限られる（スマートフォンを含む） | 非対応環境では「ターミナルを開く」を出さないか、開けない旨を表示する。内容はトップと詳細のテキストで読める（6章） |
 | 起動時の読み込みが重い | ページを開いた時点では起動せず、ターミナルを開いたときに起動する。トップの情報は最初から表示されている（6章） |
-| ブラウザ向け JavaScript のバンドル | Nitro はブラウザ向けのコードをバンドルしないため、esbuild で別途ビルドして静的アセットとして配信する。COEP の制約で CDN からの読み込みは避ける |
+| ブラウザ向け JavaScript のバンドル | Web プロジェクト（Vite）でビルドし、Nitro が静的ファイルとして配信する。COEP の制約で CDN からの読み込みは避ける |
 | 利用条件 | npm パッケージ `@webcontainer/api` 自体は MIT。ただし README に「利用すると StackBlitz の利用規約に同意したことになる」とあるため、個人ポートフォリオでの利用条件は規約で確認する（要確認） |
 
 ### 7.3 ブラウザでパスを開いたときの動き
@@ -200,7 +201,7 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 
 - 判定に使うのはリクエストヘッダー（`Accept`、`Host`）だけにする。どのランタイムでもそのまま届くため。
 - プロトコル（http / https）をサーバーで判定しない。h3 の `getRequestProtocol` は `X-Forwarded-Proto` ヘッダーか Node.js のソケットの暗号化有無で判定するため、Node.js のソケットが無いランタイムでは https を判定できない場合がある。
-- 実行時にファイルシステムを読まない。コンテンツは Nitro の server assets としてビルド時に同梱する。
+- 実行時にファイルシステムを読まない。コンテンツの生成物（Markdown・ANSI・トップの HTML）は Nitro の server assets としてビルド時に同梱する。トップの HTML は静的ファイルにしない（Vercel は静的ファイルを関数より先に返すため、`/` に置くと curl にも HTML が返る。詳細設計 2.3）。
 - 事前生成（prerender）や Nitro のキャッシュ（`routeRules` の `cache` / `swr` / `isr`）を使わない。出し分けの結果が固定されてしまうため。
 - サーバーの前に CDN やプロキシを置く場合、HTML 応答をキャッシュさせない。CDN によっては `Vary: Accept` を考慮せずにキャッシュし、curl に HTML を返してしまうため。
 
@@ -292,7 +293,7 @@ npm パッケージ `void` 0.22.0（VoidZero、現 Cloudflare 傘下。MIT）に
 | 観点 | 内容 | 要件との関係 |
 | --- | --- | --- |
 | 実行環境 | Cloudflare Workers。自分の Cloudflare アカウントへ直接デプロイするか、Void のプラットフォーム（ホスト型の Void Cloud、またはチームで自前設置したもの）へデプロイする | ランタイムは workerd と同じで、試作の動作確認と同じ条件 |
-| 対応するアプリ | Vite 8 ＋ `voidPlugin()` が前提。Void アプリ（`routes/` の Hono ベース）、メタフレームワーク（TanStack Start / React Router / SvelteKit / Nuxt / Analog / Astro）、静的サイト | **Nitro 単体（Vite なし）は対応一覧に無い**。採用するなら Void アプリへの書き換えか Nuxt 化が必要で、7.4 の「Nitro を継続」と食い違う |
+| 対応するアプリ | Vite 8 ＋ `voidPlugin()` が前提。Void アプリ（`routes/` の Hono ベース）、メタフレームワーク（TanStack Start / React Router / SvelteKit / Nuxt / Analog / Astro）、静的サイト | **Nitro 単体（Vite なし）は対応一覧に無い**。採用するなら Void アプリへの書き換えか Nuxt 化が必要で、7.4 の「Nitro を継続」と食い違う（2026-10-02 に Web 側は Vite になったが、サーバーは Nitro 単体のままなので結論は変わらない） |
 | 独自ドメイン（自分の Cloudflare へ直接） | Workers の custom domain。ゾーンを自分の Cloudflare アカウントに置く必要がある | ネームサーバーの移行が必要。Cloudflare Workers と同じメールのリスク |
 | 独自ドメイン（Void Cloud） | CNAME（通信用）と TXT（所有確認）を外部 DNS に置く方式 | ネームサーバーはさくらのままでよいが、**apex（`mewton.jp`）には CNAME を置けない**。さくらの DNS が apex の別名（ALIAS など）に対応していなければ使えない（要確認） |
 | キャッシュ | ISR は設定したときだけ有効。キャッシュキーはパスとクエリで、`Accept` を含まない | ISR を有効にすると curl に HTML を返しうる。使うなら無効のまま（7.4 と同じ） |

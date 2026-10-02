@@ -43,3 +43,5 @@ npx wrangler dev .output/server/index.mjs --assets .output/public --compatibilit
 NITRO_PRESET=vercel npm run build
 NITRO_PRESET=netlify npm run build
 ```
+
+> 注: このリポジトリの現在のコード（`server/` `client/` など）は 2026-10-01 時点の試作。詳細設計（[docs/design.md](docs/design.md)）のモノレポ構成には未対応。
