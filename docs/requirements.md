@@ -173,13 +173,15 @@ Nitro を選んだのは、同じコードをどのランタイム（Node.js、C
 | 項目 | 要件 |
 | --- | --- |
 | 言語 | 日本語のみ |
-| 公開先 | 独自ドメイン `mewton.jp`。条件と候補は 9.1 |
+| 公開先 | 独自ドメイン `mewton.jp`。Vercel（9.1・9.3） |
 | スマートフォン | 代替表示で読めること。ターミナルの操作性は問わない |
 | パフォーマンス | 代替テキストが WebContainer の起動を待たずに表示されること |
 | アクセシビリティ | 代替表示で担保する（6章） |
 | SEO / OGP | HTML に各パスのタイトル・説明・OGP 画像と、本文の代替テキストを持たせる |
 
 ### 9.1 ホスティング先
+
+**決定: Vercel（2026-10-02）**。理由: DNS はさくらのまま（メールに影響しない）、無料枠で運用できる見込み、https へのリダイレクトが標準、関数としての応答は Node.js と一致を確認済み（11章）。デプロイ手順は 9.3。
 
 条件:
 
@@ -225,11 +227,34 @@ npm パッケージ `void` 0.22.0（VoidZero、現 Cloudflare 傘下。MIT）に
 
 結論: 現時点では見送る。Void を使っても apex で使う場合の DNS の問題（ネームサーバー移行か、apex に CNAME を置けない）は解決せず、Nitro からの書き換えも必要になるため。
 
+### 9.3 Vercel へのデプロイ
+
+コードに Vercel 専用の処理は入れない（7.4）。Vercel のビルド環境では Nitro が自動で `vercel` preset を選び、`.vercel/output`（Build Output API）を出力する（`VERCEL=1` で確認済み）。`vercel.json` にはビルドコマンドだけを書く（コンテンツ検証とブラウザ向け JavaScript のビルドを必ず通すため）。
+
+手順:
+
+1. Vercel でこのリポジトリをインポートする（Framework Preset は自動検出のまま、Build Command は `vercel.json` の `npm run build` が使われる）
+2. Node.js のバージョンは 22 系以上（`package.json` の `engines`。`scripts/check-content.ts` を Node.js の型除去で実行するため 22.18 以上が必要）
+3. Vercel の管理画面で独自ドメイン `mewton.jp` を追加する
+4. さくらの DNS に、Vercel が表示する apex 用の A レコードを追加する（値は管理画面の表示に従う）。`mail` / `slmail` のレコードには触れない。CAA レコードがある場合は Vercel の証明書発行元を許可する
+5. 証明書の発行を待つ
+
+本番での確認項目:
+
+- `curl https://mewton.jp` と各パスで本文テキストが返る
+- `curl -sI http://mewton.jp` が https へのリダイレクトになる
+- ブラウザで開くと HTML が返り、`crossOriginIsolated` が `true` になる（COOP / COEP が Vercel の配信層で失われていない）
+- `curl -s https://mewton.jp/terminal.js` が JavaScript を返す（静的ファイルが関数より先に配信される）
+- 同じパスを curl とブラウザで交互に開いても取り違えない（Vercel の CDN が `Vary: Accept` を尊重する、または関数の応答をキャッシュしない）
+- ターミナル冒頭の `[diag]` 行で、標準の `curl` が使えるかを確認する（7.2）
+
 ## 10. 未決定事項
 
 - [ ] 本番ドメイン上で、標準の `curl` で `curl https://mewton.jp` が通るかの検証（7.2、11章）
 - [ ] StackBlitz の利用規約の確認（7.2）
-- [ ] ホスティング先の決定（9.1）
+- [x] ホスティング先の決定（9.1。Vercel）
+- [ ] Vercel での本番確認（9.3 の確認項目）
+- [ ] Vercel の無料枠の条件と、apex 用 A レコードの値を公式で確認（9.3）
 - [ ] Markdown をテキストに整形する方法（試作では Markdown のまま出力）
 - [ ] ANSI の色・装飾を使うか（8.1）
 - [ ] About / Contact のデータ形式
